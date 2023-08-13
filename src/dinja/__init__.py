@@ -1,3 +1,7 @@
+"""
+Dinja: A utility class for string operations.
+"""
+
 import functools
 from typing import Any, Callable, Dict, Optional
 
@@ -6,7 +10,16 @@ from jinja2.ext import Extension
 from markupsafe import Markup
 
 
+def return_value(result: Any, **params):
+    """Tag & Filter Render-Value"""
+    is_safe = params.get("is_safe", False)
+    if is_safe:
+        Markup(result)
+    return result
+
+
 def parse_render_no_content_tag(self, parser):
+    """Jinja `_render_no_content_tag` Wrapper"""
     lineno = next(parser.stream).lineno
     args = []
     return nodes.CallBlock(
@@ -15,6 +28,7 @@ def parse_render_no_content_tag(self, parser):
 
 
 def parse_render_content_tag(self, parser, name):
+    """Jinja `_render_custom_template_tag` Wrapper"""
     lineno = next(parser.stream).lineno
     body = parser.parse_statements([f"name:end{name}"], drop_needle=True)
     return nodes.CallBlock(
@@ -23,6 +37,7 @@ def parse_render_content_tag(self, parser, name):
 
 
 def parse_render_value_tag(self, parser):
+    """Jinja `_render_value_tag` Wrapper"""
     lineno = next(parser.stream).lineno
     args = [parser.parse_expression()]
     return nodes.CallBlock(
@@ -50,6 +65,7 @@ class Dinja:
     """
 
     _instance = None
+    initialized = False
     filters: Dict[str, Callable] = {}
     tags: Dict[str, Extension] = {}
 
@@ -62,17 +78,6 @@ class Dinja:
             cls._instance.initialized = False
         return cls._instance
 
-    def initialize(self, value: Any) -> None:
-        """
-        Initialize the Dinja instance with a value.
-
-        Parameters:
-        - value (Any): Value to be initialized with.
-        """
-        if not self.initialized:
-            self.value = value
-            self.initialized = True
-
     @classmethod
     def filter(cls, method: Optional[Callable] = None, **params: Any) -> Callable:
         """
@@ -82,12 +87,12 @@ class Dinja:
         - `is_safe` (bool): Indicate whether the tag result is safe for HTML rendering (default: `False`).
 
         Usage:
-        >>> @Dinja.filter(is_safe=True)
+        >>> @Dinja.filter # Dinja.filter(is_safe=True)
         >>> def my_filter(value):
         >>>     return "Filtered: " + value
 
         Returns:
-        - Filter: The custom Jinja2 filter.
+        - `Filter`: The custom Jinja2 filter.
         """
         if method is None:
             return functools.partial(cls.filter, **params)
@@ -111,39 +116,31 @@ class Dinja:
         - `is_safe` (bool): Indicate whether the tag result is safe for HTML rendering (default: `False`).
 
         Usage:
-        >>> @Dinja.tag(is_safe=True)
+        >>> @Dinja.tag # Dinja.tag(mode="value", is_safe=True)
         >>> def my_tag(content, caller):
         >>>     return '<div>' + content + '</div>'
 
         Returns:
-        - Extension: The custom Jinja2 extension class representing the tag.
-
-        Examples:
-            The following example demonstrates how to use the `@Dinja.tag` decorator to create a custom tag.
-
-            >>> @Dinja.tag(is_safe=True)
-            >>> def my_tag(content, caller):
-            >>>     return '<div>' + content + '</div>'
+        - `Extension`: The custom Jinja2 extension class representing the tag.
         """
         if method is None:
             return functools.partial(cls.tag, **params)
 
         ext_mode = params.get("mode", "simple")
-        is_safe = params.get("is_safe", False)
 
         @functools.wraps(method)
         def render_no_content_tag_wrapper(
             self, caller: Any, *args: Any, **kwargs: Any
         ) -> Any:
             result = method(*args, **kwargs)
-            return Markup(result) if is_safe else result
+            return return_value(result, **params)
 
         @functools.wraps(method)
         def render_value_tag_wrapper(
             self, content: str, caller: Any, *args: Any, **kwargs: Any
         ) -> Any:
             result = method(content, *args, **kwargs)
-            return Markup(result) if is_safe else result
+            return return_value(result, **params)
 
         @functools.wraps(method)
         def render_content_tag_wrapper(
@@ -151,14 +148,13 @@ class Dinja:
         ) -> Any:
             content = caller()
             result = method(content, *args, **kwargs)
-            return Markup(result) if is_safe else result
+            return return_value(result, **params)
 
         # Build Extension
         ext_name = method.__name__
-        ext_config = {
+        ext_config: Dict[str, Any] = {
             "tags": {ext_name},
         }
-
         match ext_mode:
             case "simple":
                 ext_config["_render_no_content_tag"] = render_no_content_tag_wrapper
