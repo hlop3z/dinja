@@ -2,6 +2,12 @@
 
 `Dinja` is a singleton class that provides decorators to create custom **`filters`** and **`tags`** for Jinja templates. It also allows you to load these filters and tags into a Jinja environment.
 
+## Install
+
+```sh
+pip install dinja
+```
+
 ## Usage
 
 - Create custom **`filters`** using the `@Dinja.filter` decorator.
