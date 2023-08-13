@@ -1,15 +1,32 @@
 import functools
+from typing import Any, Callable, Dict, Optional
 
-from jinja2 import nodes
+from jinja2 import Environment, nodes
 from jinja2.ext import Extension
 from markupsafe import Markup
 
 
-def jinja_tag_parse(self, parser):
+def parse_render_no_content_tag(self, parser):
+    lineno = next(parser.stream).lineno
+    args = []
+    return nodes.CallBlock(
+        self.call_method("_render_no_content_tag", args), [], [], []
+    ).set_lineno(lineno)
+
+
+def parse_render_content_tag(self, parser, name):
+    lineno = next(parser.stream).lineno
+    body = parser.parse_statements([f"name:end{name}"], drop_needle=True)
+    return nodes.CallBlock(
+        self.call_method("_render_custom_template_tag", []), [], [], body
+    ).set_lineno(lineno)
+
+
+def parse_render_value_tag(self, parser):
     lineno = next(parser.stream).lineno
     args = [parser.parse_expression()]
     return nodes.CallBlock(
-        self.call_method("_render_custom_template_tag", args), [], [], []
+        self.call_method("_render_value_tag", args), [], [], []
     ).set_lineno(lineno)
 
 
@@ -33,10 +50,10 @@ class Dinja:
     """
 
     _instance = None
-    filters = {}
-    tags = {}
+    filters: Dict[str, Callable] = {}
+    tags: Dict[str, Extension] = {}
 
-    def __new__(cls):
+    def __new__(cls) -> "Dinja":
         """
         Ensure a singleton instance of Dinja is created.
         """
@@ -45,7 +62,7 @@ class Dinja:
             cls._instance.initialized = False
         return cls._instance
 
-    def initialize(self, value):
+    def initialize(self, value: Any) -> None:
         """
         Initialize the Dinja instance with a value.
 
@@ -57,92 +74,122 @@ class Dinja:
             self.initialized = True
 
     @classmethod
-    def filter(cls, method=None, **params):
+    def filter(cls, method: Optional[Callable] = None, **params: Any) -> Callable:
         """
-        Decorator to create custom filters for Jinja templates.
+        Decorator to create `custom-filters` for Jinja templates.
 
-        Parameters:
-        - method (function): The filter function.
-        - params (dict): Optional arguments for the filter.
+        Parameters (`Optional`):
+        - `is_safe` (bool): Indicate whether the tag result is safe for HTML rendering (default: `False`).
 
         Usage:
-        @Dinja.filter(is_safe=True)
-        def my_filter(value):
-            return "Filtered: " + value
+        >>> @Dinja.filter(is_safe=True)
+        >>> def my_filter(value):
+        >>>     return "Filtered: " + value
 
         Returns:
-        - function: The wrapped filter function.
+        - Filter: The custom Jinja2 filter.
         """
-
-        # Optional Arguments
         if method is None:
             return functools.partial(cls.filter, **params)
 
-        # The Wrapper
         @functools.wraps(method)
-        def the_wrapper(*args, **kwargs):
+        def the_wrapper(*args: Any, **kwargs: Any) -> Any:
             is_safe = params.get("is_safe", False)
             result = method(*args, **kwargs)
             return Markup(result) if is_safe else result
 
-        # Return @Decorator
         cls.filters[method.__name__] = the_wrapper
         return the_wrapper
 
     @classmethod
-    def tag(cls, method=None, **params):
+    def tag(cls, method: Optional[Callable] = None, **params: Any) -> Extension:
         """
-        Decorator to create custom tags for Jinja templates.
+        Decorator to create `custom-tags` for Jinja templates.
 
-        Parameters:
-        - method (function): The tag function.
-        - params (dict): Optional arguments for the tag.
+        Parameters (`Optional`):
+        - `mode` (str): Jinja tag's current mode, options: {`simple`, `value`, `content`} (default: `simple`).
+        - `is_safe` (bool): Indicate whether the tag result is safe for HTML rendering (default: `False`).
 
         Usage:
-        @Dinja.tag(is_safe=True)
-        def my_tag(content, caller):
-            return '<div>' + content + '</div>'
+        >>> @Dinja.tag(is_safe=True)
+        >>> def my_tag(content, caller):
+        >>>     return '<div>' + content + '</div>'
 
         Returns:
-        - Extension: The custom Jinja2 extension class.
-        """
+        - Extension: The custom Jinja2 extension class representing the tag.
 
-        # Optional Arguments
+        Examples:
+            The following example demonstrates how to use the `@Dinja.tag` decorator to create a custom tag.
+
+            >>> @Dinja.tag(is_safe=True)
+            >>> def my_tag(content, caller):
+            >>>     return '<div>' + content + '</div>'
+        """
         if method is None:
             return functools.partial(cls.tag, **params)
 
-        # The Wrapper
+        ext_mode = params.get("mode", "simple")
+        is_safe = params.get("is_safe", False)
+
         @functools.wraps(method)
-        def the_wrapper(self, content, caller, *args, **kwargs):
-            is_safe = params.get("is_safe", False)
+        def render_no_content_tag_wrapper(
+            self, caller: Any, *args: Any, **kwargs: Any
+        ) -> Any:
+            result = method(*args, **kwargs)
+            return Markup(result) if is_safe else result
+
+        @functools.wraps(method)
+        def render_value_tag_wrapper(
+            self, content: str, caller: Any, *args: Any, **kwargs: Any
+        ) -> Any:
             result = method(content, *args, **kwargs)
             return Markup(result) if is_safe else result
+
+        @functools.wraps(method)
+        def render_content_tag_wrapper(
+            self, caller: Any, *args: Any, **kwargs: Any
+        ) -> Any:
+            content = caller()
+            result = method(content, *args, **kwargs)
+            return Markup(result) if is_safe else result
+
+        # Build Extension
+        ext_name = method.__name__
+        ext_config = {
+            "tags": {ext_name},
+        }
+
+        match ext_mode:
+            case "simple":
+                ext_config["_render_no_content_tag"] = render_no_content_tag_wrapper
+                ext_config["parse"] = parse_render_no_content_tag
+            case "value":
+                ext_config["_render_value_tag"] = render_value_tag_wrapper
+                ext_config["parse"] = parse_render_value_tag
+            case "content":
+                ext_config["_render_custom_template_tag"] = render_content_tag_wrapper
+                ext_config["parse"] = lambda self, parser: parse_render_content_tag(
+                    self, parser, ext_name
+                )
 
         extension = type(
             method.__name__.title().replace("_", ""),
             (Extension,),
-            {
-                "parse": jinja_tag_parse,
-                "tags": {method.__name__},
-                "_render_custom_template_tag": the_wrapper,
-            },
+            ext_config,
         )
 
-        # Return @Decorator
         cls.tags[method.__name__] = extension
         return extension
 
     @classmethod
-    def load(cls, jinja_env):
+    def load(cls, jinja_env: Environment) -> None:
         """
         Load custom filters and tags into a Jinja environment.
 
         Parameters:
         - jinja_env (jinja2.Environment): The Jinja environment to load into.
         """
-        # Filters
         for key, apply_filter in cls.filters.items():
             jinja_env.filters[key] = apply_filter
-        # Tags
         for tag in cls.tags.values():
             jinja_env.add_extension(tag)
