@@ -1,0 +1,42 @@
+[project]
+name = "dinja"
+version = "0.1.1"
+description = "Singleton class that provides decorators to create custom `filters` and `tags` for Jinja templates."
+authors = [
+    { name = "hlop3z", email = "23062270+hlop3z@users.noreply.github.com" },
+]
+dependencies = []
+requires-python = ">=3.10"
+readme = "README.md"
+license = { text = "MIT" }
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[project.urls]
+Homepage = "https://github.com/hlop3z/dinja/"
+# Documentation = "https://hlop3z.github.io/dinja/"
+
+[tool]
+[tool.pdm]
+
+[tool.pdm.scripts]
+dev = "python scripts/linter.py"
+pypi = "twine upload dist/*"
+pre = { shell = "pre-commit run --all-file" }
+test = "pytest -rA tests/"
+
+[tool.pdm.dev-dependencies]
+devops = [
+    "isort>=5.10.1",
+    "black>=22.6.0",
+    "pylint>=2.15.0",
+    "bandit>=1.7.4",
+    "watchdog>=2.1.9",
+    "twine>=4.0.1",
+    "mypy>=0.991",
+    "ssort>=0.11.6",
+    "pre-commit>=2.20.0",
+]
+testing = ["Jinja2>=3.1.2", "pytest>=7.4.0"]
