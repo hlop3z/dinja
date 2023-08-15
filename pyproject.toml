@@ -23,8 +23,8 @@ Homepage = "https://github.com/hlop3z/dinja/"
 
 [tool.pdm.scripts]
 dev = "python scripts/linter.py"
-pypi = "twine upload dist/*"
 pre = { shell = "pre-commit run --all-file" }
+pypi = "twine upload dist/*"
 test = "pytest -rA tests/"
 
 [tool.pdm.dev-dependencies]
