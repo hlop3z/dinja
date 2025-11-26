@@ -447,6 +447,13 @@ def release(
     if debug:
         print(f"[DEBUG] Creating git tag: {tag}")
     run_cmd(["git", "tag", "-a", tag, "-m", f"release: v{expected}"], debug=debug)
+    # Write VERSION file with the released version
+    version_file = ROOT / "VERSION"
+    if debug:
+        print(f"[DEBUG] Writing VERSION file: {version_file}")
+    version_file.write_text(f"{expected}\n", encoding="utf-8")
+    print(f"Created VERSION file with version {expected}")
+    
     if no_push:
         print("Skipping git push (--no-push flag provided).")
         if debug:
