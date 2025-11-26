@@ -10,5 +10,47 @@ repository.workspace = true
 name = "dinja_core"
 crate-type = ["rlib"]
 
-[dependencies]
 
+[features]
+default = []
+http = ["actix-web", "toml"]
+
+[dependencies]
+# HTTP Server (optional, enabled with 'http' feature)
+actix-web = { version = "4.12.0", optional = true }
+toml = { version = "0.9.8", optional = true }
+
+# deno_core for JavaScript execution
+deno_core = "0.315.0"
+tokio = { version = "1.42", features = ["full"] }
+
+# gray_matter for YAML frontmatter parsing
+gray_matter = "0.3.2"
+
+# markdown for Markdown to HTML conversion
+markdown = "1.0"
+
+# serde for JSON serialization
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# oxc crates for TSX transformation
+oxc_allocator = "0.99.0"
+oxc_parser = "0.99.0"
+oxc_codegen = "0.99.0"
+oxc_transformer = "0.99.0"
+oxc_span = "0.99.0"
+oxc_semantic = "0.99.0"
+oxc_ast = "0.99.0"
+oxc_traverse = "0.99.0"
+
+[[example]]
+name = "test_render"
+path = "examples/test_render.rs"
+
+[dev-dependencies]
+proptest = "1.5"
