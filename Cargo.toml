@@ -3,11 +3,14 @@ members = ["core", "python-bindings"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["dinja contributors"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/dinja"
+repository = "https://github.com/hlop3z/dinja"
+description = "Safe MDX renderer with a Rust core and Python bindings"
+readme = "README.md"
+documentation = "https://github.com/hlop3z/dinja#readme"
 
 [workspace.dependencies]
 # Shared dependencies can be added here
