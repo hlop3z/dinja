@@ -1,3 +1,9 @@
+<div align="center">
+
+![Dinja Logo](assets/logo.png)
+
+</div>
+
 # Dinja
 
 **Safe, deterministic MDX rendering powered by a Rust core with batteries-included Python bindings.**

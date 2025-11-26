@@ -1,13 +1,12 @@
+<div align="center">
+
+![Dinja Logo](docs/docs/assets/logo.png)
+
+</div>
+
 # Dinja
 
 Safe, deterministic MDX rendering powered by a Rust core with batteries-included Python bindings.
-
-## Why dinja?
-
-- **Native performance** – the renderer is written in Rust and avoids Node.js runtime costs.
-- **Identical output everywhere** – both the Rust crate and the Python bindings call into the same engine.
-- **Zero setup** – static JS dependencies are embedded and extracted on demand.
-- **Prebuilt binaries** – PyPI ships wheels for Linux, macOS (x86/arm), and Windows (abi3-py313+).
 
 ## Installation
 
@@ -36,16 +35,18 @@ fn main() -> anyhow::Result<()> {
 ### Python
 
 ```python
-from dinja import Renderer
+from dinja import Renderer, Input, Settings
 
 # Create a renderer instance (engine loads once)
 renderer = Renderer()
 
-# Render MDX content
-result = renderer.render({
-    "settings": {"output": "html", "minify": True, "engine": "base"},
-    "mdx": {"example.mdx": "---\ntitle: Demo\n---\n# Hello **dinja**"},
-})
+# Render MDX content with type-safe dataclasses
+result = renderer.render(
+    Input(
+        mdx={"example.mdx": "---\ntitle: Demo\n---\n# Hello **dinja**"},
+        settings=Settings(output="html", minify=True, engine="base"),
+    )
+)
 
 entry = result["files"]["example.mdx"]
 
@@ -58,27 +59,24 @@ else:
     print("error:", entry.get("error"))
 
 # Reuse the same instance for multiple renders with different modes
-result1 = renderer.render({
-    "settings": {"output": "html"},
-    "mdx": {"page1.mdx": "# Page 1"},
-})
+result1 = renderer.render(
+    Input(
+        mdx={"page1.mdx": "# Page 1"},
+        settings=Settings(output="html"),
+    )
+)
 
-result2 = renderer.render({
-    "settings": {"output": "schema"},
-    "mdx": {"page2.mdx": "# Page 2"},
-})
+result2 = renderer.render(
+    Input(
+        mdx={"page2.mdx": "# Page 2"},
+        settings=Settings(output="schema"),
+    )
+)
 ```
 
-`rendered["output"]` contains HTML, JavaScript, or schema code depending on `settings["output"]`.
+`rendered["output"]` contains HTML, JavaScript, or schema code depending on `settings.output`.
 
 More examples live in `python-bindings/examples/`.
-
-## Development
-
-| Dev Docs                  | Contents                                                      |
-| ------------------------- | ------------------------------------------------------------- |
-| `.dev-ops/DEVELOPMENT.md` | Repo layout, local workflows, release overview                |
-| `.dev-ops/RELEASE.md`     | Full release playbook (bump variants, flags, troubleshooting) |
 
 ## License
 
