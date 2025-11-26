@@ -1,0 +1,12 @@
+[project]
+name = "dinja-docs"
+version = "0.1.0"
+description = "Documentation for Dinja MDX renderer"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "mkdocs-material>=9.5.0",
+    "mkdocs-minify-plugin>=0.7.0",
+    "pymdown-extensions>=10.0.0",
+]
+

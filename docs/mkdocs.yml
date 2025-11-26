@@ -1,0 +1,83 @@
+site_name: Dinja Documentation
+site_description: Safe, deterministic MDX rendering powered by a Rust core with batteries-included Python bindings
+site_url: https://hlop3z.github.io/dinja
+repo_url: https://github.com/hlop3z/dinja
+repo_name: hlop3z/dinja
+edit_uri: edit/main/docs/docs/
+
+theme:
+  name: material
+  palette:
+    # Light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+  - attr_list
+  - md_in_html
+
+plugins:
+  - search
+  - minify:
+      minify_html: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+  - Python API:
+    - Overview: python/overview.md
+    - Renderer: python/renderer.md
+    - Data Classes: python/dataclasses.md
+    - Examples: python/examples.md
+  - Rust API:
+    - Overview: rust/overview.md
+    - RenderService: rust/render-service.md
+  - Guides:
+    - Components: guides/components.md
+    - Output Formats: guides/output-formats.md
+    - Performance: guides/performance.md
+  - Development:
+    - Contributing: development/contributing.md
+    - Building: development/building.md
+    - Testing: development/testing.md
+
+copyright: Copyright &copy; 2025 Dinja Contributors
+
