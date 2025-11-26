@@ -302,8 +302,11 @@ def bump(
 ) -> None:
     if debug:
         print("[DEBUG] Version bump operation starting...")
-        print(f"[DEBUG] version={version!r}, rust_version={rust_version!r}, python_version={python_version!r}")
-        print(f"[DEBUG] dry_run={dry_run!r}, commit={commit!r}")
+        print(f"[DEBUG] version: {version!r}")
+        print(f"[DEBUG] rust_version: {rust_version!r}")
+        print(f"[DEBUG] python_version: {python_version!r}")
+        print(f"[DEBUG] dry_run: {dry_run}")
+        print(f"[DEBUG] commit: {commit}")
     
     rust_version = rust_version or version
     python_version = python_version or version
@@ -359,7 +362,9 @@ def release(
     if debug:
         print("[DEBUG] Release operation starting...")
         print(f"[DEBUG] Target version: {version!r}")
-        print(f"[DEBUG] skip_tests={skip_tests!r}, no_push={no_push!r}, dry_run={dry_run!r}")
+        print(f"[DEBUG] skip_tests: {skip_tests}")
+        print(f"[DEBUG] no_push: {no_push}")
+        print(f"[DEBUG] dry_run: {dry_run}")
     
     ensure_clean_tree(debug=debug)
     versions = read_current_versions()
