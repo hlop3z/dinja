@@ -87,6 +87,13 @@ impl CacheEntry {
     }
 }
 
+impl Drop for CacheEntry {
+    fn drop(&mut self) {
+        // V8 isolates must be dropped LIFO (reverse creation order) or the runtime panics.
+        while self.renderers.pop_back().is_some() {}
+    }
+}
+
 thread_local! {
     static RENDERER_CACHE: RefCell<HashMap<RendererKey, CacheEntry>> =
         RefCell::new(HashMap::new());

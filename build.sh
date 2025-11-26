@@ -259,6 +259,19 @@ setup_maturin_venv() {
     log_info "Set VIRTUAL_ENV=$venv_path"
 }
 
+# Get Python executable inside the managed virtualenv
+get_venv_python() {
+    local venv_path="$SCRIPT_DIR/python-bindings/.venv"
+    if [ -x "$venv_path/bin/python" ]; then
+        echo "$venv_path/bin/python"
+        return 0
+    elif [ -x "$venv_path/Scripts/python.exe" ]; then
+        echo "$venv_path/Scripts/python.exe"
+        return 0
+    fi
+    return 1
+}
+
 # Install Python bindings in development mode
 dev_mode() {
     if ! check_python; then
@@ -305,6 +318,41 @@ dev_mode() {
     else
         log_info "You can now use: python -c 'import dinja; print(dinja.hello_py(\"World\"))'"
     fi
+}
+
+# Run Python integration tests (requires uv-managed environment)
+test_python() {
+    if ! check_python; then
+        log_warn "Python not found. Skipping Python tests."
+        return
+    fi
+
+    if ! check_uv; then
+        log_warn "uv is required to run Python tests. Install uv and rerun: https://github.com/astral-sh/uv"
+        return
+    fi
+
+    log_info "Running Python tests..."
+
+    cd python-bindings
+    setup_maturin_venv
+
+    # Sync dev dependencies (pytest, etc.) into the virtualenv
+    uv sync --dev --locked
+
+    # Ensure the native module is built and installed into the virtualenv
+    uv tool run maturin develop
+
+    local venv_python
+    if ! venv_python=$(get_venv_python); then
+        log_error "Unable to locate python executable inside .venv"
+        exit 1
+    fi
+
+    "$venv_python" -m pytest tests
+    cd ..
+
+    log_info "Python tests completed successfully"
 }
 
 # Build Python wheels
@@ -366,6 +414,7 @@ run_all() {
     log_info "Running full build, test, and dev setup..."
     build_rust
     test_rust
+    test_python
     dev_mode
     log_info "All tasks completed successfully!"
 }
@@ -386,6 +435,7 @@ case "${1:-help}" in
         ;;
     test)
         test_rust
+        test_python
         ;;
     test-core)
         test_core
