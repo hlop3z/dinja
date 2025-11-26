@@ -31,7 +31,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, Optional
+from typing import Annotated, Dict, Iterable, Optional
 
 cyclopts_module = importlib.import_module("cyclopts")
 App = cyclopts_module.App
@@ -279,26 +279,13 @@ def _default_commit_message(
 
 @app.command(help="Update version strings in project files.")
 def bump(
-    version: str | None = Parameter(
-        None, help="Version applied to both the Rust workspace and Python bindings."
-    ),
-    rust_version: str | None = Parameter(
-        None, help="Version applied only to the Rust workspace."
-    ),
-    python_version: str | None = Parameter(
-        None, help="Version applied only to the Python bindings."
-    ),
-    dry_run: bool = Parameter(
-        False, help="Show planned edits without touching the files."
-    ),
-    commit: bool = Parameter(True, help="Automatically commit the version bump."),
-    commit_message: str | None = Parameter(
-        None,
-        help="Custom commit message (defaults to 'chore: bump ...').",
-    ),
-    debug: bool = Parameter(
-        False, help="Enable debug output with verbose logging."
-    ),
+    version: Annotated[str | None, Parameter(help="Version applied to both the Rust workspace and Python bindings.")] = None,
+    rust_version: Annotated[str | None, Parameter(help="Version applied only to the Rust workspace.")] = None,
+    python_version: Annotated[str | None, Parameter(help="Version applied only to the Python bindings.")] = None,
+    dry_run: Annotated[bool, Parameter(help="Show planned edits without touching the files.")] = False,
+    commit: Annotated[bool, Parameter(help="Automatically commit the version bump.")] = True,
+    commit_message: Annotated[str | None, Parameter(help="Custom commit message (defaults to 'chore: bump ...').")] = None,
+    debug: Annotated[bool, Parameter(help="Enable debug output with verbose logging.")] = False,
 ) -> None:
     if debug:
         print("[DEBUG] Version bump operation starting...")
@@ -345,19 +332,10 @@ def release(
     version: str = Parameter(
         help="Semantic version that must already match Cargo.toml and pyproject.toml."
     ),
-    skip_tests: bool = Parameter(
-        False,
-        help="Skip Rust and Python tests (still runs fmt/clippy/uv sync).",
-    ),
-    no_push: bool = Parameter(
-        False, help="Create the tag locally without pushing HEAD/tag to origin."
-    ),
-    dry_run: bool = Parameter(
-        False, help="Run checks but do not create or push the git tag."
-    ),
-    debug: bool = Parameter(
-        False, help="Enable debug output with verbose logging."
-    ),
+    skip_tests: Annotated[bool, Parameter(help="Skip Rust and Python tests (still runs fmt/clippy/uv sync).")] = False,
+    no_push: Annotated[bool, Parameter(help="Create the tag locally without pushing HEAD/tag to origin.")] = False,
+    dry_run: Annotated[bool, Parameter(help="Run checks but do not create or push the git tag.")] = False,
+    debug: Annotated[bool, Parameter(help="Enable debug output with verbose logging.")] = False,
 ) -> None:
     if debug:
         print("[DEBUG] Release operation starting...")
