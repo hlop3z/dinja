@@ -82,7 +82,7 @@ jobs:
         working-directory: python-bindings
         run: |
           rm -rf dist
-          uv run maturin build --locked --release --out dist
+          uv tool run maturin build --locked --release --out dist
 
       - name: Publish to PyPI via Trusted Publisher
         uses: pypa/gh-action-pypi-publish@release/v1
