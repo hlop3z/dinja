@@ -140,23 +140,54 @@ def read_current_versions() -> Dict[str, str]:
 
 
 def run_cmd(
-    cmd: list[str], *, cwd: Optional[Path] = None, env: Optional[dict] = None
+    cmd: list[str],
+    *,
+    cwd: Optional[Path] = None,
+    env: Optional[dict] = None,
+    debug: bool = False,
 ) -> None:
     display_cwd = f"(cd {cwd} && " if cwd else ""
     close = ")" if cwd else ""
     print(f"$ {display_cwd}{' '.join(cmd)}{close}")
+    if debug:
+        print(f"[DEBUG] Working directory: {cwd or Path.cwd()}")
+        if env:
+            relevant_env = {k: v for k, v in env.items() if k.startswith("PYO3_") or k == "VIRTUAL_ENV"}
+            if relevant_env:
+                print(f"[DEBUG] Environment: {relevant_env}")
     subprocess.run(cmd, cwd=cwd, env=env, check=True)
 
 
-def ensure_clean_tree() -> None:
+def ensure_clean_tree(debug: bool = False) -> None:
+    if debug:
+        print("[DEBUG] Checking git working tree status...")
     try:
-        run_cmd(["git", "diff", "--quiet"])
-        run_cmd(["git", "diff", "--cached", "--quiet"])
+        run_cmd(["git", "diff", "--quiet"], debug=debug)
+        run_cmd(["git", "diff", "--cached", "--quiet"], debug=debug)
+        if debug:
+            print("[DEBUG] Working tree is clean")
     except subprocess.CalledProcessError as exc:
+        # Get list of uncommitted files for better error message
+        try:
+            result = subprocess.check_output(
+                ["git", "status", "--short"], text=True, stderr=subprocess.DEVNULL
+            ).strip()
+            if result:
+                files = "\n  ".join(result.split("\n"))
+                raise ReleaseError(
+                    f"Working tree must be clean before releasing.\n"
+                    f"Uncommitted changes:\n  {files}\n"
+                    f"Commit or stash these changes first."
+                ) from exc
+        except subprocess.CalledProcessError:
+            pass
         raise ReleaseError("Working tree must be clean before releasing.") from exc
 
 
-def ensure_uv_python() -> dict:
+def ensure_uv_python(debug: bool = False) -> dict:
+    if debug:
+        print("[DEBUG] Checking for uv and Python interpreter...")
+    
     if shutil.which("uv") is None:
         raise ReleaseError(
             "uv is required (install it from https://docs.astral.sh/uv/)."
@@ -174,7 +205,9 @@ def ensure_uv_python() -> dict:
     python_path = find_python()
     if not python_path:
         print("uv did not report a Python interpreter; attempting installation...")
-        run_cmd(["uv", "python", "install"])
+        if debug:
+            print("[DEBUG] Installing Python via uv...")
+        run_cmd(["uv", "python", "install"], debug=debug)
         python_path = find_python()
         if not python_path:
             raise ReleaseError("uv could not provide a usable Python interpreter.")
@@ -182,11 +215,17 @@ def ensure_uv_python() -> dict:
     env = os.environ.copy()
     env["PYO3_PYTHON"] = python_path
     print(f"Using PYO3_PYTHON={python_path}")
+    if debug:
+        print(f"[DEBUG] Python environment configured: {python_path}")
     return env
 
 
-def run_release_checks(*, skip_tests: bool, env: dict) -> None:
-    run_cmd(["cargo", "fmt", "--all", "--check"], env=env)
+def run_release_checks(*, skip_tests: bool, env: dict, debug: bool = False) -> None:
+    if debug:
+        print("[DEBUG] Starting release checks...")
+        print(f"[DEBUG] Skip tests: {skip_tests}")
+    
+    run_cmd(["cargo", "fmt", "--all", "--check"], env=env, debug=debug)
     run_cmd(
         [
             "cargo",
@@ -198,13 +237,17 @@ def run_release_checks(*, skip_tests: bool, env: dict) -> None:
             "warnings",
         ],
         env=env,
+        debug=debug,
     )
     if not skip_tests:
-        run_cmd(["cargo", "test", "--all-features"], env=env)
+        run_cmd(["cargo", "test", "--all-features"], env=env, debug=debug)
 
-    run_cmd(["uv", "sync", "--dev"], cwd=PYTHON_BINDINGS, env=env)
+    run_cmd(["uv", "sync", "--dev"], cwd=PYTHON_BINDINGS, env=env, debug=debug)
     if not skip_tests:
-        run_cmd(["uv", "run", "pytest"], cwd=PYTHON_BINDINGS, env=env)
+        run_cmd(["uv", "run", "pytest"], cwd=PYTHON_BINDINGS, env=env, debug=debug)
+    
+    if debug:
+        print("[DEBUG] All release checks completed successfully")
 
 
 app = App(help=__doc__)
@@ -237,26 +280,31 @@ def _default_commit_message(
 @app.command(help="Update version strings in project files.")
 def bump(
     version: str | None = Parameter(
-        default=None,
-        help="Version applied to both the Rust workspace and Python bindings.",
+        None, help="Version applied to both the Rust workspace and Python bindings."
     ),
     rust_version: str | None = Parameter(
-        default=None, help="Version applied only to the Rust workspace."
+        None, help="Version applied only to the Rust workspace."
     ),
     python_version: str | None = Parameter(
-        default=None, help="Version applied only to the Python bindings."
+        None, help="Version applied only to the Python bindings."
     ),
     dry_run: bool = Parameter(
-        default=False, help="Show planned edits without touching the files."
+        False, help="Show planned edits without touching the files."
     ),
-    commit: bool = Parameter(
-        default=True, help="Automatically commit the version bump."
-    ),
+    commit: bool = Parameter(True, help="Automatically commit the version bump."),
     commit_message: str | None = Parameter(
-        default=None,
+        None,
         help="Custom commit message (defaults to 'chore: bump ...').",
     ),
+    debug: bool = Parameter(
+        False, help="Enable debug output with verbose logging."
+    ),
 ) -> None:
+    if debug:
+        print("[DEBUG] Version bump operation starting...")
+        print(f"[DEBUG] version={version!r}, rust_version={rust_version!r}, python_version={python_version!r}")
+        print(f"[DEBUG] dry_run={dry_run!r}, commit={commit!r}")
+    
     rust_version = rust_version or version
     python_version = python_version or version
     if not rust_version and not python_version:
@@ -268,17 +316,23 @@ def bump(
     changed = update_versions(rust=rust_version, python=python_version, dry_run=dry_run)
     if not changed:
         print("No files were updated.")
+        if debug:
+            print("[DEBUG] All version fields already match target versions")
         return
 
     if dry_run or not commit:
         if dry_run and commit:
             print("[dry-run] Skipping git commit.")
+        if debug:
+            print("[DEBUG] Skipping commit (dry_run or commit disabled)")
         return
 
     msg = commit_message or _default_commit_message(
         rust_version=rust_version, python_version=python_version
     )
-    run_cmd(["git", "commit", "-am", msg])
+    if debug:
+        print(f"[DEBUG] Commit message: {msg}")
+    run_cmd(["git", "commit", "-am", msg], debug=debug)
 
 
 @app.command(
@@ -289,18 +343,29 @@ def release(
         help="Semantic version that must already match Cargo.toml and pyproject.toml."
     ),
     skip_tests: bool = Parameter(
-        default=False,
+        False,
         help="Skip Rust and Python tests (still runs fmt/clippy/uv sync).",
     ),
     no_push: bool = Parameter(
-        default=False, help="Create the tag locally without pushing HEAD/tag to origin."
+        False, help="Create the tag locally without pushing HEAD/tag to origin."
     ),
     dry_run: bool = Parameter(
-        default=False, help="Run checks but do not create or push the git tag."
+        False, help="Run checks but do not create or push the git tag."
+    ),
+    debug: bool = Parameter(
+        False, help="Enable debug output with verbose logging."
     ),
 ) -> None:
-    ensure_clean_tree()
+    if debug:
+        print("[DEBUG] Release operation starting...")
+        print(f"[DEBUG] Target version: {version!r}")
+        print(f"[DEBUG] skip_tests={skip_tests!r}, no_push={no_push!r}, dry_run={dry_run!r}")
+    
+    ensure_clean_tree(debug=debug)
     versions = read_current_versions()
+    if debug:
+        print(f"[DEBUG] Current versions: {versions}")
+    
     expected = version
     mismatches = {
         component: value for component, value in versions.items() if value != expected
@@ -313,27 +378,44 @@ def release(
             f"Version mismatch. Expected {expected} everywhere but found {mismatch_lines}. "
             "Use `python release.py bump --version ...` first."
         )
+    
+    if debug:
+        print(f"[DEBUG] Version check passed: all components at {expected}")
 
-    env = ensure_uv_python()
-    run_release_checks(skip_tests=skip_tests, env=env)
+    env = ensure_uv_python(debug=debug)
+    
+    run_release_checks(skip_tests=skip_tests, env=env, debug=debug)
 
     tag = f"v{expected}"
     if dry_run:
         print(f"[dry-run] Would create git tag {tag} and push to origin.")
+        if debug:
+            print(f"[DEBUG] Dry run mode: skipping actual git operations")
         return
 
-    run_cmd(["git", "tag", "-a", tag, "-m", f"release: v{expected}"])
+    if debug:
+        print(f"[DEBUG] Creating git tag: {tag}")
+    run_cmd(["git", "tag", "-a", tag, "-m", f"release: v{expected}"], debug=debug)
     if no_push:
         print("Skipping git push (--no-push flag provided).")
+        if debug:
+            print("[DEBUG] Tag created locally, not pushing to origin")
         return
 
-    run_cmd(["git", "push", "origin", "HEAD"])
-    run_cmd(["git", "push", "origin", tag])
+    if debug:
+        print("[DEBUG] Pushing HEAD and tag to origin...")
+    run_cmd(["git", "push", "origin", "HEAD"], debug=debug)
+    run_cmd(["git", "push", "origin", tag], debug=debug)
+    if debug:
+        print("[DEBUG] Release completed successfully")
 
 
 def main(argv: Optional[Iterable[str]] = None) -> None:
     try:
-        app(argv=argv)
+        if argv is None:
+            app()
+        else:
+            app(argv)
     except ReleaseError as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
