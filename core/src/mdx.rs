@@ -52,6 +52,62 @@ fn markdown_options() -> Options {
     }
 }
 
+/// Unwraps the first Fragment wrapper from HTML output if present.
+///
+/// If the HTML starts with `<Fragment>` and ends with `</Fragment>`, this function
+/// extracts only the children content, removing the Fragment wrapper.
+///
+/// This handles the case where MDX content is wrapped in a Fragment by default,
+/// and we only want to return the actual content without the wrapper.
+///
+/// # Arguments
+/// * `html` - HTML string that may be wrapped in a Fragment
+///
+/// # Returns
+/// HTML string with Fragment wrapper removed if present, otherwise unchanged
+fn unwrap_fragment(html: &str) -> String {
+    let trimmed = html.trim();
+    
+    // Check if the HTML starts with <Fragment (case-insensitive, allowing attributes)
+    let fragment_start_patterns = ["<Fragment", "<fragment"];
+    let mut fragment_start: Option<usize> = None;
+    
+    for pattern in &fragment_start_patterns {
+        if let Some(pos) = trimmed.find(pattern) {
+            fragment_start = Some(pos);
+            break;
+        }
+    }
+    
+    if let Some(start) = fragment_start {
+        // Find the closing > of the opening tag (handle self-closing or with attributes)
+        if let Some(tag_end) = trimmed[start..].find('>') {
+            let tag_end = start + tag_end + 1;
+            let content_start = tag_end;
+            
+            // Find the closing </Fragment> tag (case-insensitive)
+            let remaining = &trimmed[content_start..];
+            let fragment_end_patterns = ["</Fragment>", "</fragment>"];
+            let mut fragment_end: Option<usize> = None;
+            
+            for pattern in &fragment_end_patterns {
+                if let Some(pos) = remaining.rfind(pattern) {
+                    fragment_end = Some(pos);
+                    break;
+                }
+            }
+            
+            if let Some(end_pos) = fragment_end {
+                // Extract just the content between the tags
+                return remaining[..end_pos].trim().to_string();
+            }
+        }
+    }
+    
+    // No Fragment wrapper found, return as-is
+    html.to_string()
+}
+
 fn render_markdown(content: &str) -> Result<String, MdxError> {
     let options = markdown_options();
     to_html_with_options(content, &options).map_err(|e| MdxError::MarkdownRender(e.to_string()))
@@ -176,7 +232,10 @@ fn render_with_engine_pipeline(
     let template_output = render_template(context, &javascript_output)?;
 
     match context.settings.output {
-        OutputFormat::Html => Ok(template_output),
+        OutputFormat::Html => {
+            // Unwrap Fragment wrapper if present - only return children of first Fragment
+            Ok(unwrap_fragment(&template_output))
+        }
         OutputFormat::Javascript => {
             transform_tsx_to_js_for_output(&template_output, context.settings.minify).map_err(|e| {
                 MdxError::TsxTransform(format!("Failed to transform template to JavaScript: {e}"))
