@@ -344,7 +344,7 @@ def release(
         print(f"[DEBUG] no_push: {no_push}")
         print(f"[DEBUG] dry_run: {dry_run}")
     
-    ensure_clean_tree(debug=debug)
+    # Check if we need to update versions first
     versions = read_current_versions()
     if debug:
         print(f"[DEBUG] Current versions: {versions}")
@@ -353,13 +353,78 @@ def release(
     mismatches = {
         component: value for component, value in versions.items() if value != expected
     }
+    version_updated = False
     if mismatches:
         mismatch_lines = ", ".join(
             f"{comp}={value}" for comp, value in mismatches.items()
         )
+        if debug:
+            print(f"[DEBUG] Version mismatch detected: {mismatch_lines}")
+            print(f"[DEBUG] Automatically updating all versions to {expected}...")
+        
+        # Automatically update versions (both rust and python)
+        changed = update_versions(rust=expected, python=expected, dry_run=dry_run)
+        if changed:
+            version_updated = True
+            if dry_run:
+                print(f"[dry-run] Would update versions to {expected}")
+            else:
+                print(f"Updated all versions to {expected}")
+                # Commit the version bump automatically
+                msg = _default_commit_message(rust_version=expected, python_version=expected)
+                if debug:
+                    print(f"[DEBUG] Committing version bump: {msg}")
+                run_cmd(["git", "add", "Cargo.toml", "python-bindings/pyproject.toml", "python-bindings/dinja/__about__.py"], debug=debug)
+                run_cmd(["git", "commit", "-m", msg], debug=debug)
+                # Re-read versions to confirm
+                versions = read_current_versions()
+                if debug:
+                    print(f"[DEBUG] Updated versions: {versions}")
+        else:
+            if debug:
+                print("[DEBUG] No version files needed updating")
+    
+    # Check tree is clean (after version update/commit if it happened)
+    if not version_updated:
+        # Normal case: check tree is clean before proceeding
+        ensure_clean_tree(debug=debug)
+    elif dry_run:
+        # In dry-run, we didn't actually modify files, so just check normally
+        ensure_clean_tree(debug=debug)
+    else:
+        # We updated versions and committed, so tree should be clean now
+        try:
+            run_cmd(["git", "diff", "--quiet"], debug=debug)
+            run_cmd(["git", "diff", "--cached", "--quiet"], debug=debug)
+            if debug:
+                print("[DEBUG] Working tree is clean after version update")
+        except subprocess.CalledProcessError as exc:
+            # Get list of uncommitted files for better error message
+            try:
+                result = subprocess.check_output(
+                    ["git", "status", "--short"], text=True, stderr=subprocess.DEVNULL
+                ).strip()
+                if result:
+                    files = "\n  ".join(result.split("\n"))
+                    raise ReleaseError(
+                        f"Working tree has uncommitted changes after version update:\n  {files}\n"
+                        f"Please commit or stash these changes first."
+                    ) from exc
+            except subprocess.CalledProcessError:
+                pass
+            raise ReleaseError("Working tree must be clean before releasing.") from exc
+    
+    # Final check - ensure versions match after update
+    versions = read_current_versions()
+    final_mismatches = {
+        component: value for component, value in versions.items() if value != expected
+    }
+    if final_mismatches:
+        mismatch_lines = ", ".join(
+            f"{comp}={value}" for comp, value in final_mismatches.items()
+        )
         raise ReleaseError(
-            f"Version mismatch. Expected {expected} everywhere but found {mismatch_lines}. "
-            "Use `python release.py bump --version ...` first."
+            f"Version mismatch after update. Expected {expected} everywhere but found {mismatch_lines}."
         )
     
     if debug:
