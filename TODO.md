@@ -1,3 +1,3 @@
 # TODO
 
-- `uv run release.py bump --version 0.2.1`
+- `uv run release.py bump --version 0.2.2`
