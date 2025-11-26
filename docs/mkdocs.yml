@@ -4,9 +4,12 @@ site_url: https://hlop3z.github.io/dinja
 repo_url: https://github.com/hlop3z/dinja
 repo_name: hlop3z/dinja
 edit_uri: edit/main/docs/docs/
+docs_dir: docs
 
 theme:
   name: material
+  logo: assets/media/logo.png
+  favicon: assets/media/logo.png
   palette:
     # Light mode
     - scheme: default
@@ -31,6 +34,8 @@ theme:
     - search.highlight
     - content.code.copy
     - content.code.annotate
+  extra_css:
+    - assets/css/logo.css
 
 markdown_extensions:
   - pymdownx.highlight:

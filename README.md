@@ -1,6 +1,6 @@
 <div align="center">
 
-![Dinja Logo](docs/docs/assets/logo.png)
+![Dinja Logo](docs/docs/assets/media/logo.png)
 
 </div>
 

@@ -26,7 +26,7 @@ except ImportError:
 MAX_WIDTH = 200
 
 ROOT = Path(__file__).resolve().parent.parent
-LOGO_PATH = ROOT / "docs" / "docs" / "assets" / "logo.png"
+LOGO_PATH = ROOT / "docs" / "docs" / "assets" / "media" / "logo.png"
 
 
 def resize_logo(max_width: int = MAX_WIDTH) -> None:
@@ -59,7 +59,8 @@ def resize_logo(max_width: int = MAX_WIDTH) -> None:
     resized_img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
     # Save the resized image (overwrite original)
-    resized_img.save(LOGO_PATH, optimize=True)
+    # Preserve the original format and optimize
+    resized_img.save(LOGO_PATH, format="PNG", optimize=True)
     print(f"Resized logo to {new_width}x{new_height}")
     print(f"Saved to {LOGO_PATH}")
 
