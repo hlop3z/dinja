@@ -414,21 +414,24 @@ def release(
                 pass
             raise ReleaseError("Working tree must be clean before releasing.") from exc
     
-    # Final check - ensure versions match after update
-    versions = read_current_versions()
-    final_mismatches = {
-        component: value for component, value in versions.items() if value != expected
-    }
-    if final_mismatches:
-        mismatch_lines = ", ".join(
-            f"{comp}={value}" for comp, value in final_mismatches.items()
-        )
-        raise ReleaseError(
-            f"Version mismatch after update. Expected {expected} everywhere but found {mismatch_lines}."
-        )
-    
-    if debug:
-        print(f"[DEBUG] Version check passed: all components at {expected}")
+    # Final check - ensure versions match after update (skip in dry-run if we showed updates)
+    if not (dry_run and version_updated):
+        versions = read_current_versions()
+        final_mismatches = {
+            component: value for component, value in versions.items() if value != expected
+        }
+        if final_mismatches:
+            mismatch_lines = ", ".join(
+                f"{comp}={value}" for comp, value in final_mismatches.items()
+            )
+            raise ReleaseError(
+                f"Version mismatch after update. Expected {expected} everywhere but found {mismatch_lines}."
+            )
+        
+        if debug:
+            print(f"[DEBUG] Version check passed: all components at {expected}")
+    elif debug:
+        print(f"[DEBUG] Skipping final version check (dry-run mode, versions would be updated to {expected})")
 
     env = ensure_uv_python(debug=debug)
     
