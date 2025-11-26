@@ -105,6 +105,22 @@ jobs:
         working-directory: python-bindings
         run: uv run pytest
 
+      - name: Clean build artifacts
+        working-directory: python-bindings
+        run: |
+          # Remove build directories
+          rm -rf dist target/maturin
+          # Remove any .pyd/.dll files from the package directory
+          # These are created by 'maturin develop' during tests and must be removed before building
+          rm -f dinja/*.pyd dinja/*.dll dinja/_native.pyd dinja/_native.dll 2>/dev/null || true
+          # Also handle Windows path separators
+          rm -f dinja\\*.pyd dinja\\*.dll dinja\\_native.pyd dinja\\_native.dll 2>/dev/null || true
+          # Find and remove any other .pyd/.dll files outside build directories
+          find . -type f \( -name "*.pyd" -o -name "*.dll" \) ! -path "./target/*" ! -path "./dist/*" ! -path "./.venv/*" -delete 2>/dev/null || true
+          # Verify cleanup (this will show files if any remain, or succeed if none found)
+          echo "Verifying cleanup - checking for remaining .pyd/.dll files:"
+          find . -type f \( -name "*.pyd" -o -name "*.dll" \) ! -path "./target/*" ! -path "./dist/*" ! -path "./.venv/*" && echo "WARNING: Found .pyd/.dll files that should have been removed!" || echo "✓ Cleanup successful - no .pyd/.dll files in source tree"
+
       - name: Build Python distributions
         working-directory: python-bindings
         env:
