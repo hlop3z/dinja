@@ -10,6 +10,7 @@ classifiers = [
 authors = [
     { name = "hlop3z", email = "23062270+hlop3z@users.noreply.github.com" },
 ]
+license = { text = "BSD-3-Clause" }
 
 [project.urls]
 Homepage = "https://github.com/hlop3z/dinja"
