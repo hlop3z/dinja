@@ -1,6 +1,8 @@
 [project]
 name = "dinja"
 version = "0.2.1"
+description = "Safe, deterministic MDX rendering powered by a Rust core with batteries-included Python bindings"
+readme = "../README.md"
 requires-python = ">=3.13"
 classifiers = [
     "Programming Language :: Rust",
