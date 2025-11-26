@@ -314,9 +314,9 @@ dev_mode() {
     
     log_info "Python bindings installed in development mode"
     if check_uv; then
-        log_info "You can now use: uv run python -c 'import dinja; print(dinja.hello_py(\"World\"))'"
+        log_info "You can now use: cd python-bindings && uv run examples/readme_example.py"
     else
-        log_info "You can now use: python -c 'import dinja; print(dinja.hello_py(\"World\"))'"
+        log_info "You can now use: cd python-bindings && python examples/readme_example.py"
     fi
 }
 
