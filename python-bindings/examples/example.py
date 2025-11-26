@@ -1,15 +1,18 @@
 """Example usage of the dinja MDX rendering library.
 
-This example demonstrates how to use the simple render function to render MDX content
+This example demonstrates how to use the Renderer class to render MDX content
 to HTML, JavaScript, or schema format.
 """
 
 import json
-from dinja import render
+from dinja import Renderer
 
 
 def main():
     """Main example function."""
+    # Create a renderer instance (engine loads once)
+    renderer = Renderer()
+    
     # Example 1: Simple MDX rendering with base engine
     print("Example 1: Simple MDX rendering")
     print("=" * 50)
@@ -29,7 +32,7 @@ def main():
     }
 
     try:
-        result = render(input_data)
+        result = renderer.render(input_data)
 
         print(f"Total files processed: {result['total']}")
         print(f"Succeeded: {result['succeeded']}")
@@ -82,7 +85,7 @@ def main():
         "components": {
             "MyComponent": {
                 "name": "MyComponent",
-                "code": "function MyComponent(props) { return <div>Custom: {props.prop1}</div>; }",
+                "code": "function Component(props) { return <div>Custom: {props.prop1}</div>; }",
                 "docs": "A custom component example",
                 "args": None,
             },
@@ -90,7 +93,7 @@ def main():
     }
 
     try:
-        result = render(input_data_custom)
+        result = renderer.render(input_data_custom)
         print(
             f"Custom component rendering: {result['succeeded']} succeeded, {result['failed']} failed"
         )
@@ -125,7 +128,7 @@ def main():
         }
 
         try:
-            result = render(input_data_format)
+            result = renderer.render(input_data_format)
             if result["succeeded"] > 0:
                 filename = list(result["files"].keys())[0]
                 outcome = result["files"][filename]

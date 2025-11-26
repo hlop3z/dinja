@@ -36,14 +36,17 @@ fn main() -> anyhow::Result<()> {
 ### Python
 
 ```python
-from dinja import render
+from dinja import Renderer
 
-payload = {
+# Create a renderer instance (engine loads once)
+renderer = Renderer()
+
+# Render MDX content
+result = renderer.render({
     "settings": {"output": "html", "minify": True, "engine": "base"},
     "mdx": {"example.mdx": "---\ntitle: Demo\n---\n# Hello **dinja**"},
-}
+})
 
-result = render(payload)
 entry = result["files"]["example.mdx"]
 
 if entry["status"] == "success":
@@ -53,6 +56,17 @@ if entry["status"] == "success":
     print("html:", rendered.get("output"))
 else:
     print("error:", entry.get("error"))
+
+# Reuse the same instance for multiple renders with different modes
+result1 = renderer.render({
+    "settings": {"output": "html"},
+    "mdx": {"page1.mdx": "# Page 1"},
+})
+
+result2 = renderer.render({
+    "settings": {"output": "schema"},
+    "mdx": {"page2.mdx": "# Page 2"},
+})
 ```
 
 `rendered["output"]` contains HTML, JavaScript, or schema code depending on `settings["output"]`.

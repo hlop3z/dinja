@@ -1,4 +1,4 @@
-import dinja
+from dinja import Renderer
 
 
 if __name__ == "__main__":
@@ -7,7 +7,8 @@ if __name__ == "__main__":
         "mdx": {"example.mdx": "---\ntitle: Demo\n---\n# Hello **dinja**"},
     }
 
-    result = dinja.render(payload)
+    renderer = Renderer()
+    result = renderer.render(payload)
     entry = result["files"]["example.mdx"]
 
     if entry["status"] == "success":

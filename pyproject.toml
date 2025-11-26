@@ -6,3 +6,8 @@ dependencies = [
     "cyclopts>=2.9",
 ]
 
+[tool.uv.workspace]
+members = [
+    "docs",
+]
+

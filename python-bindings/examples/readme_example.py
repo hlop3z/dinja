@@ -10,9 +10,9 @@ from __future__ import annotations
 from pprint import pprint
 from typing import Any, Dict
 
-from dinja import render
+from dinja import Renderer
 
-# The payload matches the NamedMdxBatchInput structure from the Rust core.
+# The payload matches the Input structure from the Rust core.
 PAYLOAD: Dict[str, Any] = {
     "settings": {
         "output": "schema",  # "html", "javascript", or "schema"
@@ -38,7 +38,8 @@ PAYLOAD: Dict[str, Any] = {
 
 
 def main() -> None:
-    outcome = render(PAYLOAD)
+    renderer = Renderer()
+    outcome = renderer.render(PAYLOAD)
     print(f"Processed {outcome['total']} file(s)")
     print(f"Succeeded: {outcome['succeeded']}  Failed: {outcome['failed']}")
 

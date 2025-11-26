@@ -6,7 +6,7 @@ from copy import deepcopy
 
 import pytest
 
-from dinja import render
+from dinja import Renderer
 
 
 BASE_PAYLOAD = {
@@ -25,7 +25,8 @@ BASE_PAYLOAD = {
 
 def test_render_html_success() -> None:
     """End-to-end success case mirrors the `/render` handler contract."""
-    result = render(deepcopy(BASE_PAYLOAD))
+    renderer = Renderer()
+    result = renderer.render(deepcopy(BASE_PAYLOAD))
 
     assert result["total"] == 1
     assert result["succeeded"] == 1
@@ -41,10 +42,11 @@ def test_render_html_success() -> None:
 
 
 def test_render_rejects_non_string_mdx() -> None:
-    """NamedMdxBatchInput enforces string content, so invalid data raises ValueError."""
+    """Input enforces string content, so invalid data raises ValueError."""
+    renderer = Renderer()
     invalid_payload = deepcopy(BASE_PAYLOAD)
     invalid_payload["mdx"]["broken.mdx"] = 12345  # type: ignore[assignment]
 
     with pytest.raises(ValueError):
-        render(invalid_payload)
+        renderer.render(invalid_payload)
 
