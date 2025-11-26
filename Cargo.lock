@@ -658,7 +658,7 @@ dependencies = [
 
 [[package]]
 name = "dinja-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -683,7 +683,7 @@ dependencies = [
 
 [[package]]
 name = "dinja-python-bindings"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dinja-core",
  "once_cell",
