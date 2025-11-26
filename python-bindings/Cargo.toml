@@ -1,0 +1,15 @@
+[package]
+name = "dinja-python-bindings"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "dinja_python_bindings"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.27.1", features = ["extension-module"] }
+dinja-core = { path = "../core" }
