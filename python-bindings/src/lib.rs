@@ -126,7 +126,7 @@ fn render(py: Python, input_dict: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
 
 /// The dinja Python module
 #[pymodule]
-fn dinja<'py>(_py: Python<'py>, m: &Bound<'py, PyModule>) -> PyResult<()> {
+fn _native<'py>(_py: Python<'py>, m: &Bound<'py, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(render, m)?)?;
     Ok(())
 }
