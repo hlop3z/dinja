@@ -43,10 +43,9 @@ fn init_static_dir() -> PyResult<PathBuf> {
 
             fs::write(static_dir.join("core.js"), CORE_JS)
                 .map_err(|e| PyValueError::new_err(format!("Failed to write core.js: {}", e)))?;
-
             Ok(static_dir)
         })
-        .map(|p| p.clone())
+        .cloned()
 }
 
 /// Stateless render function for MDX content

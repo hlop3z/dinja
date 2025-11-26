@@ -25,6 +25,7 @@ use oxc_semantic::SemanticBuilder;
 use oxc_span::SourceType;
 use oxc_transformer::{JsxRuntime, TransformOptions, Transformer};
 use std::borrow::Cow;
+use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -180,7 +181,7 @@ fn convert_component_refs_in_ast(code: &str, component_names: &HashSet<&str>) ->
 
     // Sort by length (longest first) to avoid partial matches
     let mut sorted_names: Vec<&str> = component_names.iter().copied().collect();
-    sorted_names.sort_by(|a, b| b.len().cmp(&a.len()));
+    sorted_names.sort_by_key(|name| Reverse(name.len()));
 
     for component_name in sorted_names {
         // Pattern 1: h(ComponentName, -> h('ComponentName',

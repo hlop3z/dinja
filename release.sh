@@ -29,6 +29,26 @@ VERSION="$1"
 shift
 COMMIT_MSG=${1:-"release: v${VERSION}"}
 
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+ensure_uv_python() {
+  if python_path=$(uv python find 2>/dev/null); then
+    :
+  else
+    echo "uv could not locate a Python interpreter; installing one..."
+    uv python install >/dev/null 2>&1
+    python_path=$(uv python find 2>/dev/null) || {
+      echo "Failed to locate Python even after running 'uv python install'." >&2
+      exit 1
+    }
+  fi
+
+  export PYO3_PYTHON="$python_path"
+  echo "Using PYO3_PYTHON=${PYO3_PYTHON}"
+}
+
 if ! command -v uv >/dev/null 2>&1; then
   echo "uv is required (see project rules for installation)." >&2
   exit 1
@@ -51,6 +71,8 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
   echo "Working tree must be clean before releasing." >&2
   exit 1
 fi
+
+ensure_uv_python
 
 echo "==> Checking Rust workspace"
 cargo fmt --all --check

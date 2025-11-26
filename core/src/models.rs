@@ -45,19 +45,14 @@ pub enum OutputFormat {
 }
 
 /// Rendering engine selection
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum RenderEngine {
     /// Use built-in base engine components
+    #[default]
     Base,
     /// Use user-provided custom components
     Custom,
-}
-
-impl Default for RenderEngine {
-    fn default() -> Self {
-        Self::Base
-    }
 }
 
 /// Rendering settings
