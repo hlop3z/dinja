@@ -60,10 +60,10 @@ pub struct RenderSettings {
     /// Example: `export default { tool: "foo", etc: "bar" }`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub utils: Option<String>,
-    /// Optional map of directive names to their string values
-    /// These can be used for custom processing or metadata
+    /// Optional list of directive prefixes for schema extraction
+    /// Used to identify directive attributes (e.g., ["v-", "@", "x-"])
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub directives: Option<HashMap<String, String>>,
+    pub directives: Option<Vec<String>>,
 }
 
 const fn default_minify_true() -> bool {

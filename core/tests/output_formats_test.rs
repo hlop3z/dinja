@@ -334,15 +334,22 @@ fn test_schema_output_format() {
     assert!(result.output.is_some());
     let schema = result.output.as_ref().unwrap();
 
-    // Schema output should be a JSON array of component names
+    // Schema output should be a JSON object with components and directives
     println!("Schema output:\n{}", schema);
 
-    // Parse as JSON array
-    let components: Vec<String> =
-        serde_json::from_str(schema).expect("Schema should be a valid JSON array");
+    // Parse as JSON object
+    let schema_obj: serde_json::Value =
+        serde_json::from_str(schema).expect("Schema should be valid JSON");
 
     // Should contain Button and Card (unique, sorted)
-    assert_eq!(components, vec!["Button", "Card"]);
+    let components = schema_obj["components"]
+        .as_array()
+        .expect("components should be array");
+    let component_names: Vec<&str> = components.iter().map(|v| v.as_str().unwrap()).collect();
+    assert_eq!(component_names, vec!["Button", "Card"]);
+
+    // Directives should be present but empty
+    assert!(schema_obj["directives"].is_object());
 }
 
 #[test]
@@ -397,15 +404,22 @@ fn test_schema_output_with_complex_jsx() {
 
     println!("Complex schema output:\n{}", schema);
 
-    // Parse as JSON array
-    let components: Vec<String> =
-        serde_json::from_str(schema).expect("Schema should be a valid JSON array");
+    // Parse as JSON object
+    let schema_obj: serde_json::Value =
+        serde_json::from_str(schema).expect("Schema should be valid JSON");
 
     // Should contain all unique component names, sorted
+    let components = schema_obj["components"]
+        .as_array()
+        .expect("components should be array");
+    let component_names: Vec<&str> = components.iter().map(|v| v.as_str().unwrap()).collect();
     assert_eq!(
-        components,
+        component_names,
         vec!["Container", "Footer", "Header", "List", "ListItem"]
     );
+
+    // Directives should be present but empty
+    assert!(schema_obj["directives"].is_object());
 }
 
 #[test]
@@ -457,12 +471,19 @@ fn test_schema_output_with_frontmatter() {
 
     println!("Schema with frontmatter output:\n{}", schema);
 
-    // Parse as JSON array
-    let components: Vec<String> =
-        serde_json::from_str(schema).expect("Schema should be a valid JSON array");
+    // Parse as JSON object
+    let schema_obj: serde_json::Value =
+        serde_json::from_str(schema).expect("Schema should be valid JSON");
 
     // Should contain Alert and Card (sorted)
-    assert_eq!(components, vec!["Alert", "Card"]);
+    let components = schema_obj["components"]
+        .as_array()
+        .expect("components should be array");
+    let component_names: Vec<&str> = components.iter().map(|v| v.as_str().unwrap()).collect();
+    assert_eq!(component_names, vec!["Alert", "Card"]);
+
+    // Directives should be present but empty
+    assert!(schema_obj["directives"].is_object());
 }
 
 #[test]

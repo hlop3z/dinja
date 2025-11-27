@@ -198,39 +198,183 @@ pub fn create_error_response(error: &anyhow::Error) -> RenderedMdx {
     }
 }
 
-/// Extracts unique component names from HTML/MDX content.
-///
-/// Finds all JSX-style elements that start with a capital letter (custom components)
-/// and returns them as a unique sorted list.
+/// Schema extraction result containing components and directives information
+#[derive(serde::Serialize, Default)]
+struct SchemaResult {
+    /// Unique component names (elements starting with capital letters)
+    components: Vec<String>,
+    /// Directive information extracted based on settings.directives prefixes
+    directives: DirectivesResult,
+}
+
+/// Directive extraction results
+#[derive(serde::Serialize, Default)]
+struct DirectivesResult {
+    /// Unique directive attribute keys (e.g., "v-on:click", "x-show")
+    keys: Vec<String>,
+    /// Unique directive patterns (e.g., "v-on:*", "x-*")
+    patterns: Vec<String>,
+    /// Unique directive values
+    values: Vec<serde_json::Value>,
+}
+
+/// Extracts schema information from JSON tree including components and directives
 ///
 /// # Arguments
-/// * `content` - The HTML/MDX content to scan for component names
+/// * `json_tree` - The rendered JSON tree from core.js engine
+/// * `directive_prefixes` - Optional list of directive prefixes to extract (e.g., ["v-", "@", "x-"])
 ///
 /// # Returns
-/// A JSON array of unique component names as a string
-fn extract_component_names(content: &str) -> Result<String, MdxError> {
-    // Regex to match JSX opening tags that start with capital letters
-    // Matches: <ComponentName, <ComponentName>, <ComponentName attr="value">
-    // Does not match: <div>, <span>, etc. (lowercase HTML tags)
-    let re = Regex::new(r"<([A-Z][a-zA-Z0-9]*)")
-        .map_err(|e| MdxError::MarkdownRender(format!("Regex compilation failed: {e}")))?;
+/// A JSON string containing components and directives schema
+fn extract_schema_from_json(
+    json_tree: &str,
+    directive_prefixes: Option<&Vec<String>>,
+) -> Result<String, MdxError> {
+    let tree: serde_json::Value = serde_json::from_str(json_tree)
+        .map_err(|e| MdxError::FrontmatterParse(format!("Failed to parse JSON tree: {e}")))?;
 
-    let mut component_names: HashSet<String> = HashSet::new();
+    let mut components: HashSet<String> = HashSet::new();
+    let mut directive_keys: HashSet<String> = HashSet::new();
+    let mut directive_patterns: HashSet<String> = HashSet::new();
+    let mut directive_values: HashSet<String> = HashSet::new(); // Store as JSON strings for dedup
 
-    for cap in re.captures_iter(content) {
-        if let Some(name) = cap.get(1) {
-            component_names.insert(name.as_str().to_string());
+    // Get directive prefixes as a slice for efficient iteration
+    let prefixes: Vec<&str> = directive_prefixes
+        .map(|d| d.iter().map(|s| s.as_str()).collect())
+        .unwrap_or_default();
+
+    // Recursively traverse the JSON tree
+    traverse_json_tree(
+        &tree,
+        &prefixes,
+        &mut components,
+        &mut directive_keys,
+        &mut directive_patterns,
+        &mut directive_values,
+    );
+
+    // Convert to sorted vectors for consistent output
+    let mut sorted_components: Vec<String> = components.into_iter().collect();
+    sorted_components.sort();
+
+    let mut sorted_keys: Vec<String> = directive_keys.into_iter().collect();
+    sorted_keys.sort();
+
+    let mut sorted_patterns: Vec<String> = directive_patterns.into_iter().collect();
+    sorted_patterns.sort();
+
+    // Parse directive values back to JSON values
+    let mut sorted_values: Vec<serde_json::Value> = directive_values
+        .into_iter()
+        .filter_map(|s| serde_json::from_str(&s).ok())
+        .collect();
+    // Sort values by their JSON string representation for consistency
+    sorted_values.sort_by_key(|a| a.to_string());
+
+    let result = SchemaResult {
+        components: sorted_components,
+        directives: DirectivesResult {
+            keys: sorted_keys,
+            patterns: sorted_patterns,
+            values: sorted_values,
+        },
+    };
+
+    serde_json::to_string(&result)
+        .map_err(|e| MdxError::FrontmatterParse(format!("Failed to serialize schema: {e}")))
+}
+
+/// Recursively traverses the JSON tree to extract components and directives
+fn traverse_json_tree(
+    node: &serde_json::Value,
+    prefixes: &[&str],
+    components: &mut HashSet<String>,
+    directive_keys: &mut HashSet<String>,
+    directive_patterns: &mut HashSet<String>,
+    directive_values: &mut HashSet<String>,
+) {
+    match node {
+        serde_json::Value::Object(obj) => {
+            // Check for component type (capitalized tag names, excluding built-in elements)
+            if let Some(serde_json::Value::String(tag)) = obj.get("type") {
+                if !tag.is_empty()
+                    && tag
+                        .chars()
+                        .next()
+                        .map(|c| c.is_uppercase())
+                        .unwrap_or(false)
+                    && tag != "Fragment"
+                // Exclude built-in Fragment
+                {
+                    components.insert(tag.clone());
+                }
+            }
+
+            // Check attributes for directives
+            if let Some(serde_json::Value::Object(attrs)) = obj.get("attributes") {
+                for (key, value) in attrs {
+                    // Check if this attribute matches any directive prefix
+                    for prefix in prefixes {
+                        if key.starts_with(prefix) {
+                            directive_keys.insert(key.clone());
+
+                            // Extract pattern (e.g., "v-on:click" -> "v-on:*")
+                            let pattern = if key.contains(':') {
+                                let parts: Vec<&str> = key.splitn(2, ':').collect();
+                                format!("{}:*", parts[0])
+                            } else {
+                                format!("{}*", prefix)
+                            };
+                            directive_patterns.insert(pattern);
+
+                            // Store value as JSON string for dedup
+                            if let Ok(value_str) = serde_json::to_string(value) {
+                                directive_values.insert(value_str);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Recurse into children
+            if let Some(children) = obj.get("children") {
+                traverse_json_tree(
+                    children,
+                    prefixes,
+                    components,
+                    directive_keys,
+                    directive_patterns,
+                    directive_values,
+                );
+            }
+
+            // Recurse into all object values
+            for value in obj.values() {
+                traverse_json_tree(
+                    value,
+                    prefixes,
+                    components,
+                    directive_keys,
+                    directive_patterns,
+                    directive_values,
+                );
+            }
         }
+        serde_json::Value::Array(arr) => {
+            for item in arr {
+                traverse_json_tree(
+                    item,
+                    prefixes,
+                    components,
+                    directive_keys,
+                    directive_patterns,
+                    directive_values,
+                );
+            }
+        }
+        _ => {}
     }
-
-    // Convert to sorted vector for consistent output
-    let mut sorted_names: Vec<String> = component_names.into_iter().collect();
-    sorted_names.sort();
-
-    // Return as JSON array
-    serde_json::to_string(&sorted_names).map_err(|e| {
-        MdxError::FrontmatterParse(format!("Failed to serialize component names: {e}"))
-    })
 }
 
 fn render_with_engine_pipeline(
@@ -242,28 +386,77 @@ fn render_with_engine_pipeline(
 
     match context.settings.output {
         OutputFormat::Schema => {
-            // For schema output, extract unique component names from the markdown
-            extract_component_names(html_output)
+            // For schema output, render to JSON first then extract schema information
+            // This allows us to extract both components and directives from the tree
+
+            // For schema, convert component function references to strings
+            // Start by extracting component names from the HTML content (JSX tags starting with capital letters)
+            let mut component_names: HashSet<String> = HashSet::new();
+
+            // Extract from HTML content
+            let re = Regex::new(r"<([A-Z][a-zA-Z0-9]*)").unwrap();
+            for cap in re.captures_iter(html_output) {
+                if let Some(name) = cap.get(1) {
+                    component_names.insert(name.as_str().to_string());
+                }
+            }
+
+            // Also include names from component definitions if provided
+            if let Some(components) = context.components {
+                for (key, comp_def) in components.iter() {
+                    let name = comp_def
+                        .name
+                        .as_ref()
+                        .cloned()
+                        .unwrap_or_else(|| key.clone());
+                    component_names.insert(name);
+                }
+            }
+
+            if !component_names.is_empty() {
+                transform_config.component_names = Some(component_names);
+            }
+
+            let javascript_output = transform_tsx_to_js_with_config(html_output, transform_config)
+                .map_err(|e| {
+                    MdxError::TsxTransform(format!("Failed to transform TSX to JavaScript: {e}"))
+                })?;
+
+            // Render to JSON tree using core.js engine
+            let json_tree = render_template_to_schema(context, &javascript_output)?;
+
+            // Extract schema from JSON tree (components + directives)
+            extract_schema_from_json(&json_tree, context.settings.directives.as_ref())
         }
         OutputFormat::Html | OutputFormat::Javascript | OutputFormat::Json => {
             // For json output, convert component function references to strings
             // For HTML output, keep as function references so they can be rendered
             // For JavaScript output, keep Preact syntax with h() and Fragment
             if matches!(context.settings.output, OutputFormat::Json) {
-                if let Some(components) = context.components {
-                    let component_names: std::collections::HashSet<String> = components
-                        .iter()
-                        .map(|(key, comp_def)| {
-                            comp_def
-                                .name
-                                .as_ref()
-                                .cloned()
-                                .unwrap_or_else(|| key.clone())
-                        })
-                        .collect();
-                    if !component_names.is_empty() {
-                        transform_config.component_names = Some(component_names);
+                // Extract component names from HTML content (JSX tags starting with capital letters)
+                let mut component_names: HashSet<String> = HashSet::new();
+
+                let re = Regex::new(r"<([A-Z][a-zA-Z0-9]*)").unwrap();
+                for cap in re.captures_iter(html_output) {
+                    if let Some(name) = cap.get(1) {
+                        component_names.insert(name.as_str().to_string());
                     }
+                }
+
+                // Also include names from component definitions if provided
+                if let Some(components) = context.components {
+                    for (key, comp_def) in components.iter() {
+                        let name = comp_def
+                            .name
+                            .as_ref()
+                            .cloned()
+                            .unwrap_or_else(|| key.clone());
+                        component_names.insert(name);
+                    }
+                }
+
+                if !component_names.is_empty() {
+                    transform_config.component_names = Some(component_names);
                 }
             }
 
