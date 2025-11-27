@@ -11,6 +11,8 @@ export interface RenderSettings {
   output: OutputFormat;
   /** Whether to minify the output */
   minify: boolean;
+  /** Optional JavaScript snippet to inject as global utilities (must use `export default { ... }`) */
+  utils?: string;
 }
 
 /**

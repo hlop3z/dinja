@@ -32,7 +32,8 @@
 //! let renderer = JsRenderer::new("static")?;
 //! let html = renderer.render_component(
 //!     "function View(context = {{}}) {{ return engine.h('div', null, 'Hello'); }}",
-//!     Some(r#"{"name": "World"}"#)
+//!     Some(r#"{"name": "World"}"#),
+//!     None
 //! )?;
 //! # Ok(())
 //! # }
@@ -102,6 +103,7 @@ impl JsRenderer {
     /// # Arguments
     /// * `component_code` - JavaScript code that defines and exports a component
     /// * `props` - Optional JSON string of props to pass to the component
+    /// * `utils_code` - Optional JavaScript snippet to inject as global utils
     ///
     /// # Returns
     /// Rendered HTML string
@@ -109,6 +111,7 @@ impl JsRenderer {
         &self,
         component_code: &str,
         props: Option<&str>,
+        utils_code: Option<&str>,
     ) -> AnyhowResult<String> {
         let props_json = props.unwrap_or("{}");
         with_runtime(Rc::clone(&self.runtime), |runtime| {
@@ -116,7 +119,7 @@ impl JsRenderer {
             setup_context(runtime, props_json).map_err(anyhow::Error::from)?;
 
             let render_script =
-                component_render_script(component_code, props_json).map_err(anyhow::Error::from)?;
+                component_render_script(component_code, props_json, utils_code).map_err(anyhow::Error::from)?;
 
             // Evaluate and get the result
             let result = runtime
@@ -138,6 +141,7 @@ impl JsRenderer {
     /// * `transformed_js` - JavaScript code from TSX transformation
     /// * `props` - Optional JSON string of props
     /// * `components` - Optional map of component definitions to inject
+    /// * `utils_code` - Optional JavaScript snippet to inject as global utils
     ///
     /// # Returns
     /// Rendered HTML string
@@ -146,6 +150,7 @@ impl JsRenderer {
         transformed_js: &str,
         props: Option<&str>,
         components: Option<&HashMap<String, ComponentDefinition>>,
+        utils_code: Option<&str>,
     ) -> AnyhowResult<String> {
         let component_bootstrap = component_bootstrap_script(components)?;
 
@@ -167,7 +172,7 @@ impl JsRenderer {
 
         let wrapped_code = wrap_transformed_component(&component_bootstrap, transformed_js, &component_names);
 
-        self.render_component(&wrapped_code, props)
+        self.render_component(&wrapped_code, props, utils_code)
     }
 
     /// Renders a JavaScript component to schema (JSON string) using core.js engine
@@ -175,6 +180,7 @@ impl JsRenderer {
     /// # Arguments
     /// * `component_code` - JavaScript code that defines and exports a component
     /// * `props` - Optional JSON string of props to pass to the component
+    /// * `utils_code` - Optional JavaScript snippet to inject as global utils
     ///
     /// # Returns
     /// Rendered schema as JSON string
@@ -182,6 +188,7 @@ impl JsRenderer {
         &self,
         component_code: &str,
         props: Option<&str>,
+        utils_code: Option<&str>,
     ) -> AnyhowResult<String> {
         let props_json = props.unwrap_or("{}");
         with_runtime(Rc::clone(&self.runtime), |runtime| {
@@ -189,7 +196,7 @@ impl JsRenderer {
             setup_context(runtime, props_json).map_err(anyhow::Error::from)?;
 
             let render_script =
-                schema_render_script(component_code, props_json).map_err(anyhow::Error::from)?;
+                schema_render_script(component_code, props_json, utils_code).map_err(anyhow::Error::from)?;
 
             // Evaluate and get the result
             let result = runtime
@@ -211,6 +218,7 @@ impl JsRenderer {
     /// * `transformed_js` - JavaScript code from TSX transformation
     /// * `props` - Optional JSON string of props
     /// * `components` - Optional map of component definitions to inject
+    /// * `utils_code` - Optional JavaScript snippet to inject as global utils
     ///
     /// # Returns
     /// Rendered schema as JSON string
@@ -219,6 +227,7 @@ impl JsRenderer {
         transformed_js: &str,
         props: Option<&str>,
         components: Option<&HashMap<String, ComponentDefinition>>,
+        utils_code: Option<&str>,
     ) -> AnyhowResult<String> {
         let component_bootstrap = component_bootstrap_script(components)?;
 
@@ -240,7 +249,7 @@ impl JsRenderer {
 
         let wrapped_code = wrap_transformed_component(&component_bootstrap, transformed_js, &component_names);
 
-        self.render_component_to_schema(&wrapped_code, props)
+        self.render_component_to_schema(&wrapped_code, props, utils_code)
     }
 }
 

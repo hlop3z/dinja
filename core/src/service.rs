@@ -47,6 +47,7 @@
 //!     settings: RenderSettings {
 //!         output: OutputFormat::Html,
 //!         minify: true,
+//!         utils: None,
 //!     },
 //!     mdx: mdx_files,
 //!     components: None,

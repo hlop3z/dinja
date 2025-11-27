@@ -219,6 +219,7 @@ mod tests {
             settings: RenderSettings {
                 output,
                 minify: true,
+                utils: None,
             },
             mdx,
             components: None,
@@ -627,6 +628,7 @@ mod tests {
             settings: RenderSettings {
                 output: OutputFormat::Html,
                 minify: true,
+                utils: None,
             },
             mdx,
             components: Some(components),

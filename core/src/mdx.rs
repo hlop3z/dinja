@@ -306,6 +306,7 @@ fn render_template(
             javascript_output,
             Some(context.props_json),
             context.components,
+            context.settings.utils.as_deref(),
         )
         .map_err(|e| {
             log_render_error(&e, javascript_output, "Component");
@@ -323,6 +324,7 @@ fn render_template_to_schema(
             javascript_output,
             Some(context.props_json),
             context.components,
+            context.settings.utils.as_deref(),
         )
         .map_err(|e| {
             log_render_error(&e, javascript_output, "Schema");

@@ -52,6 +52,25 @@ pub(super) fn resolve_component_code() -> String {
     )
 }
 
+/// Processes utils code and extracts the object from `export default { ... }`
+/// Returns the utils declaration code or empty string if processing fails
+/// Failures are silently ignored per user requirement
+fn process_utils_code(utils_code: &str) -> String {
+    let trimmed = utils_code.trim();
+
+    // Try to extract the object from "export default { ... }"
+    if let Some(rest) = trimmed.strip_prefix("export default") {
+        let obj = rest.trim();
+        // Basic validation: should start with { and end with }
+        if obj.starts_with('{') && obj.ends_with('}') {
+            return format!("var utils = {};", obj);
+        }
+    }
+
+    // If extraction fails, silently ignore and return empty string
+    String::new()
+}
+
 /// Builds a render script wrapper with common component resolution logic
 ///
 /// ## Performance Optimizations
@@ -74,13 +93,20 @@ pub(super) fn build_render_script_wrapper(
     component_code: &str,
     props_json: &str,
     render_body: &str,
+    utils_code: Option<&str>,
 ) -> Result<String, MdxError> {
+    // Process utils code if provided
+    let utils_declaration = utils_code
+        .map(process_utils_code)
+        .unwrap_or_else(String::new);
+
     // Pre-allocate with estimated capacity for better performance
     // Strategy: Sum all input lengths + fixed overhead to avoid reallocations
     let estimated_capacity = component_bootstrap.len()
         + component_code.len()
         + props_json.len()
         + render_body.len()
+        + utils_declaration.len()
         + 200; // Base script overhead (function wrapper, etc.)
     let mut script = String::with_capacity(estimated_capacity);
 
@@ -93,11 +119,14 @@ pub(super) fn build_render_script_wrapper(
         (function() {{
             {component_bootstrap}
 
+            // Inject utils if provided
+            {utils_declaration}
+
             // Execute the component code
             {component_code}
-            
+
             {component_resolution}
-            
+
             // Context originates from trusted serde_json serialization
             // Create context function using reducer pattern for dotted path access
             const contextData = {props_json};
@@ -109,11 +138,12 @@ pub(super) fn build_render_script_wrapper(
                     }}, options);
                 }};
             }})(contextData);
-            
+
             {render_body}
         }})()
         "#,
         component_bootstrap = component_bootstrap,
+        utils_declaration = utils_declaration,
         component_code = component_code,
         component_resolution = component_resolution,
         props_json = props_json,
@@ -128,6 +158,7 @@ pub(super) fn build_render_script_wrapper(
 pub(super) fn component_render_script(
     component_code: &str,
     props_json: &str,
+    utils_code: Option<&str>,
 ) -> Result<String, MdxError> {
     const RENDER_BODY: &str = r#"
             // Render using engine-render-to-string
@@ -140,13 +171,14 @@ pub(super) fn component_render_script(
             }
     "#;
 
-    build_render_script_wrapper("", component_code, props_json, RENDER_BODY)
+    build_render_script_wrapper("", component_code, props_json, RENDER_BODY, utils_code)
 }
 
 /// Generates a render script for schema output using core.js engine
 pub(super) fn schema_render_script(
     component_code: &str,
     props_json: &str,
+    utils_code: Option<&str>,
 ) -> Result<String, MdxError> {
     const RENDER_BODY: &str = r#"
             // Render using core.js engine.render() which returns JSON string
@@ -161,7 +193,7 @@ pub(super) fn schema_render_script(
             }
     "#;
 
-    build_render_script_wrapper("", component_code, props_json, RENDER_BODY)
+    build_render_script_wrapper("", component_code, props_json, RENDER_BODY, utils_code)
 }
 
 /// Wraps transformed component code with bootstrap

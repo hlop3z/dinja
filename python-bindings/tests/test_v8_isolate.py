@@ -97,7 +97,7 @@ def test_renderer_multiple_modes() -> None:
     print("-" * 60)
     try:
         renderer = dinja.Renderer()
-    except Exception as e:
+    except BaseException as e:
         if _is_v8_isolate_error(e):
             pytest.skip(
                 f"v8 isolate error when creating Renderer (likely from previous tests): {type(e).__name__}"

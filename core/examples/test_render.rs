@@ -17,7 +17,7 @@ fn main() {
     let static_dir = PathBuf::from("static");
     let renderer = JsRenderer::new(&static_dir).expect("Failed to create renderer");
 
-    match renderer.render_transformed_component(&js, Some("{}"), None) {
+    match renderer.render_transformed_component(&js, Some("{}"), None, None) {
         Ok(html) => {
             println!("Rendered HTML:");
             println!("{}", html);

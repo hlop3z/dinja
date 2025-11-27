@@ -55,6 +55,11 @@ pub struct RenderSettings {
     /// Enable minification
     #[serde(default = "default_minify_true")]
     pub minify: bool,
+    /// Optional JavaScript snippet to inject as global utils
+    /// Must use `export default` to return a single object
+    /// Example: `export default { tool: "foo", etc: "bar" }`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub utils: Option<String>,
 }
 
 const fn default_minify_true() -> bool {
@@ -66,6 +71,7 @@ impl Default for RenderSettings {
         Self {
             output: OutputFormat::default(),
             minify: true,
+            utils: None,
         }
     }
 }

@@ -187,6 +187,39 @@ const schema = renderer.render({
 });
 ```
 
+### Using Global Utils
+
+Inject global JavaScript utilities available in all components:
+
+```javascript
+import { Renderer } from '@dinja/core';
+
+const renderer = new Renderer();
+
+const result = renderer.render({
+  settings: {
+    output: 'html',
+    minify: false,
+    utils: "export default { greeting: 'Hello', emoji: '👋' }"
+  },
+  mdx: {
+    'page.mdx': '<Greeting name="Alice" />'
+  },
+  components: {
+    Greeting: {
+      name: 'Greeting',
+      code: `
+        export default function Component(props) {
+          return <div>{utils.greeting} {props.name} {utils.emoji}</div>;
+        }
+      `
+    }
+  }
+});
+```
+
+The `utils` object must be exported using `export default { ... }` and will be available globally as `utils` in all component code. Invalid utils code is silently ignored.
+
 ## API Reference
 
 ### `Renderer`
@@ -207,6 +240,7 @@ Renders MDX content.
 - `input.settings` - Render settings
   - `output`: `'html' | 'javascript' | 'schema' | 'json'` - Output format
   - `minify`: `boolean` - Whether to minify the output
+  - `utils`: `string` (optional) - JavaScript snippet to inject as global utilities (must use `export default { ... }`)
 - `input.mdx` - Map of file names to MDX content strings
 - `input.components` - Optional map of component names to definitions
 

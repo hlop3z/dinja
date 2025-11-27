@@ -42,6 +42,7 @@ fn test_html_output_simple_markdown() {
         settings: RenderSettings {
             output: OutputFormat::Html,
             minify: true,
+            utils: None,
         },
         mdx: mdx_files,
         components: None,
@@ -86,6 +87,7 @@ fn test_html_output_with_frontmatter() {
         settings: RenderSettings {
             output: OutputFormat::Html,
             minify: true,
+            utils: None,
         },
         mdx: mdx_files,
         components: None,
@@ -129,6 +131,7 @@ fn test_html_output_minified() {
         settings: RenderSettings {
             output: OutputFormat::Html,
             minify: true,
+            utils: None,
         },
         mdx: mdx_files,
         components: None,
@@ -165,6 +168,7 @@ fn test_html_output_with_jsx() {
         settings: RenderSettings {
             output: OutputFormat::Html,
             minify: true,
+            utils: None,
         },
         mdx: mdx_files,
         components: None,
@@ -200,6 +204,7 @@ fn test_javascript_output_format() {
         settings: RenderSettings {
             output: OutputFormat::Javascript,
             minify: true,
+            utils: None,
         },
         mdx: mdx_files,
         components: None,
@@ -241,6 +246,7 @@ fn test_javascript_output_with_frontmatter() {
         settings: RenderSettings {
             output: OutputFormat::Javascript,
             minify: true,
+            utils: None,
         },
         mdx: mdx_files,
         components: None,
@@ -285,6 +291,7 @@ fn test_schema_output_format() {
         settings: RenderSettings {
             output: OutputFormat::Schema,
             minify: false,
+            utils: None,
         },
         mdx: mdx_files,
         components: None,
@@ -346,6 +353,7 @@ fn test_schema_output_with_complex_jsx() {
         settings: RenderSettings {
             output: OutputFormat::Schema,
             minify: false,
+            utils: None,
         },
         mdx: mdx_files,
         components: None,
@@ -393,6 +401,7 @@ fn test_schema_output_with_frontmatter() {
         settings: RenderSettings {
             output: OutputFormat::Schema,
             minify: false,
+            utils: None,
         },
         mdx: mdx_files,
         components: None,
@@ -446,6 +455,7 @@ fn test_batch_multiple_files_different_formats() {
         settings: RenderSettings {
             output: OutputFormat::Html,
             minify: true,
+            utils: None,
         },
         mdx: mdx_files_html,
         components: None,
@@ -466,6 +476,7 @@ fn test_batch_multiple_files_different_formats() {
         settings: RenderSettings {
             output: OutputFormat::Javascript,
             minify: true,
+            utils: None,
         },
         mdx: mdx_files_js,
         components: None,
@@ -486,6 +497,7 @@ fn test_batch_multiple_files_different_formats() {
         settings: RenderSettings {
             output: OutputFormat::Schema,
             minify: false,
+            utils: None,
         },
         mdx: mdx_files_schema,
         components: None,
@@ -507,6 +519,7 @@ fn test_empty_batch() {
         settings: RenderSettings {
             output: OutputFormat::Html,
             minify: true,
+            utils: None,
         },
         mdx: HashMap::new(),
         components: None,
@@ -541,6 +554,7 @@ fn test_output_format_consistency() {
             settings: RenderSettings {
                 output: format.clone(),
                 minify: true,
+                utils: None,
             },
             mdx: mdx_files,
             components: None,
