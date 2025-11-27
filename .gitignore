@@ -2,10 +2,13 @@
 # Custom
 # ---------------------------------------------------------------------------
 # .idea/
-.legacy_code/
 .cursor/
+.claude/*
+!.claude/commands/
+.ai/
 .ai-notes/
 .artifacts/
+.legacy_code/
 
 # ---------------------------------------------------------------------------
 # Python Bytecode / Cache
