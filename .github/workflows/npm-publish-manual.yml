@@ -1,0 +1,176 @@
+name: Publish to npm (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 0.1.0)'
+        required: true
+        type: string
+      tag:
+        description: 'npm tag (latest, beta, alpha, next)'
+        required: true
+        type: choice
+        default: 'latest'
+        options:
+          - latest
+          - beta
+          - alpha
+          - next
+      dry_run:
+        description: 'Dry run (build only, do not publish)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.settings.target }}
+    runs-on: ${{ matrix.settings.host }}
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          # macOS
+          - host: macos-latest
+            target: x86_64-apple-darwin
+            build: npm run build -- --target x86_64-apple-darwin
+          - host: macos-latest
+            target: aarch64-apple-darwin
+            build: npm run build -- --target aarch64-apple-darwin
+
+          # Windows
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+            build: npm run build
+          - host: windows-latest
+            target: aarch64-pc-windows-msvc
+            build: npm run build -- --target aarch64-pc-windows-msvc
+
+          # Linux GNU
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            build: npm run build -- --target x86_64-unknown-linux-gnu
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            build: npm run build -- --target aarch64-unknown-linux-gnu
+
+          # Linux musl
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            build: npm run build -- --target x86_64-unknown-linux-musl
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            build: npm run build -- --target aarch64-unknown-linux-musl
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.settings.target }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry/index
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-registry-
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ matrix.settings.target }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ matrix.settings.target }}-cargo-build-
+
+      - name: Install dependencies
+        working-directory: js-bindings
+        run: npm install
+
+      - name: Build native module
+        working-directory: js-bindings
+        run: ${{ matrix.settings.build }}
+        env:
+          CARGO_PROFILE_RELEASE_LTO: 'fat'
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '1'
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindings-${{ matrix.settings.target }}
+          path: js-bindings/*.node
+          if-no-files-found: error
+
+  publish:
+    name: Publish to npm
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # For creating releases
+      id-token: write  # For npm OIDC publishing
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: js-bindings/artifacts
+
+      - name: Move artifacts to package root
+        working-directory: js-bindings
+        run: |
+          for dir in artifacts/bindings-*; do
+            if [ -d "$dir" ]; then
+              mv "$dir"/*.node . 2>/dev/null || true
+            fi
+          done
+          ls -la *.node
+
+      - name: Install dependencies
+        working-directory: js-bindings
+        run: npm install
+
+      - name: Update version
+        working-directory: js-bindings
+        run: npm version ${{ github.event.inputs.version }} --no-git-tag-version
+
+      - name: Publish to npm (dry run)
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        working-directory: js-bindings
+        run: npm publish --dry-run --tag ${{ github.event.inputs.tag }}
+
+      - name: Publish to npm
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        working-directory: js-bindings
+        run: npm publish --provenance --tag ${{ github.event.inputs.tag }} --access public
+
+      - name: Create GitHub Release
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: Release v${{ github.event.inputs.version }}
+          body: |
+            ## @dinja/core v${{ github.event.inputs.version }}
+
+            Published to npm with tag: `${{ github.event.inputs.tag }}`
+
+            Install: `npm install @dinja/core@${{ github.event.inputs.tag }}`
+          draft: false
+          prerelease: ${{ github.event.inputs.tag != 'latest' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

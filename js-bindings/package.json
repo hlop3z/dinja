@@ -1,0 +1,71 @@
+{
+  "name": "@dinja/core",
+  "version": "0.1.0",
+  "description": "Fast MDX renderer with component support - JavaScript bindings",
+  "main": "wrapper.js",
+  "types": "index.d.ts",
+  "keywords": [
+    "mdx",
+    "markdown",
+    "jsx",
+    "react",
+    "renderer",
+    "napi",
+    "rust",
+    "performance"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hlop3z/dinja.git",
+    "directory": "js-bindings"
+  },
+  "bugs": {
+    "url": "https://github.com/hlop3z/dinja/issues"
+  },
+  "homepage": "https://github.com/hlop3z/dinja/tree/main/js-bindings#readme",
+  "files": [
+    "index.js",
+    "wrapper.js",
+    "index.d.ts",
+    "*.node"
+  ],
+  "napi": {
+    "binaryName": "dinja-js-bindings",
+    "targets": [
+      "x86_64-pc-windows-msvc",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-pc-windows-msvc",
+      "aarch64-apple-darwin",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-musl"
+    ]
+  },
+  "engines": {
+    "node": ">= 18"
+  },
+  "scripts": {
+    "artifacts": "napi artifacts",
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform",
+    "prepublishOnly": "napi prepublish -t npm",
+    "test": "node --test test/*.test.js",
+    "universal": "napi universal",
+    "version": "napi version"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.4.1"
+  },
+  "optionalDependencies": {
+    "@dinja/core-win32-x64-msvc": "0.1.0",
+    "@dinja/core-darwin-x64": "0.1.0",
+    "@dinja/core-linux-x64-gnu": "0.1.0",
+    "@dinja/core-win32-arm64-msvc": "0.1.0",
+    "@dinja/core-darwin-arm64": "0.1.0",
+    "@dinja/core-linux-arm64-gnu": "0.1.0",
+    "@dinja/core-linux-x64-musl": "0.1.0",
+    "@dinja/core-linux-arm64-musl": "0.1.0"
+  }
+}
