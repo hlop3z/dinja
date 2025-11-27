@@ -158,7 +158,7 @@ fn test_html_output_minified() {
         .as_ref()
         .expect("HTML output should be present");
     // Minified HTML should have reduced whitespace
-    assert!(html.len() > 0);
+    assert!(!html.is_empty());
 }
 
 #[test]
@@ -237,7 +237,7 @@ fn test_javascript_output_format() {
     let js = result.output.as_ref().unwrap();
 
     // JavaScript output should contain React/JSX constructs
-    assert!(js.len() > 0);
+    assert!(!js.is_empty());
     println!("JavaScript output:\n{}", js);
 }
 
@@ -284,7 +284,7 @@ fn test_javascript_output_with_frontmatter() {
 
     // Verify JavaScript output is present
     let js = result.output.as_ref().expect("JS output should be present");
-    assert!(js.len() > 0);
+    assert!(!js.is_empty());
     println!("JavaScript with frontmatter:\n{}", js);
 }
 
@@ -576,7 +576,7 @@ fn test_output_format_consistency() {
 
         let outcome = service
             .render_batch(&input)
-            .expect(&format!("Failed to render with format {:?}", format));
+            .unwrap_or_else(|_| panic!("Failed to render with format {:?}", format));
 
         assert!(
             outcome.is_all_success(),
