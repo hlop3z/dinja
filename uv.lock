@@ -4,6 +4,7 @@ requires-python = ">=3.13"
 
 [manifest]
 members = [
+    "dinja-client-example",
     "dinja-docs",
     "dinja-release-tools",
 ]
@@ -131,6 +132,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/1b/0f/fe026df2ab8301e30
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7a/e8/77a231ae531cf38765b75ddf27dae28bb5f70b41d8bb4f15ce1650e93f57/cyclopts-4.3.0-py3-none-any.whl", hash = "sha256:91a30b69faf128ada7cfeaefd7d9649dc222e8b2a8697f1fc99e4ee7b7ca44f3", size = 187184, upload-time = "2025-11-25T02:59:32.21Z" },
 ]
+
+[[package]]
+name = "dinja-client-example"
+version = "0.1.0"
+source = { virtual = "examples/client" }
+dependencies = [
+    { name = "requests" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "requests", specifier = ">=2.31.0" }]
 
 [[package]]
 name = "dinja-docs"

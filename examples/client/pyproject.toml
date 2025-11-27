@@ -1,0 +1,8 @@
+[project]
+name = "dinja-client-example"
+version = "0.1.0"
+description = "Example client for dinja HTTP server"
+requires-python = ">=3.13"
+dependencies = [
+    "requests>=2.31.0",
+]

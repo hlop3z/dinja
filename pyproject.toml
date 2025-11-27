@@ -15,5 +15,6 @@ dependencies = [
 [tool.uv.workspace]
 members = [
     "docs",
+    "examples/client",
 ]
 

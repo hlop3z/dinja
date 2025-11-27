@@ -50,3 +50,46 @@ def test_render_rejects_non_string_mdx() -> None:
     with pytest.raises(ValueError):
         renderer.render(invalid_payload)
 
+
+def test_render_custom_component_html() -> None:
+    """Test that custom components render to regular HTML."""
+    renderer = Renderer()
+    
+    payload = {
+        "settings": {
+            "output": "html",
+            "minify": True,
+            "engine": "custom",
+            "components": [],
+        },
+        "mdx": {
+            "test.mdx": "# Hello World\n\n<Button>Submit</Button>",
+        },
+        "components": {
+            "Button": {
+                "name": "Button",
+                "code": "function Component(props) { return engine.h('button', null, props.children); }",
+                "docs": None,
+                "args": None,
+            },
+        },
+    }
+    
+    result = renderer.render(payload)
+    
+    assert result["total"] == 1
+    assert result["succeeded"] == 1
+    assert result["failed"] == 0
+    
+    file_result = result["files"]["test.mdx"]
+    assert file_result["status"] == "success"
+    
+    rendered = file_result["result"]
+    output = rendered.get("output") or ""
+    
+    # Verify the HTML contains the rendered component
+    assert "<h1>Hello World</h1>" in output
+    assert "<button>" in output
+    assert "Submit" in output
+    assert "</button>" in output
+
