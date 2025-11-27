@@ -4,6 +4,7 @@ use dinja_core::service::{
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use once_cell::sync::OnceCell;
+use serde::Deserialize;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -15,6 +16,21 @@ const CORE_JS: &str = include_str!("../../core/static/core.js");
 
 // Global static directory path - created once on first use
 static STATIC_DIR: OnceCell<PathBuf> = OnceCell::new();
+
+/// Configuration options for the Renderer
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+#[napi(object)]
+pub struct RendererConfig {
+    /// Maximum number of cached renderers (default: 4)
+    pub max_cached_renderers: Option<u32>,
+    /// Maximum number of files in a batch request (default: 1000)
+    pub max_batch_size: Option<u32>,
+    /// Maximum MDX content size per file in bytes (default: 10 MB)
+    pub max_mdx_content_size: Option<u32>,
+    /// Maximum component code size in bytes (default: 1 MB)
+    pub max_component_code_size: Option<u32>,
+}
 
 /// Initialize the static directory with embedded files
 fn init_static_dir() -> Result<PathBuf> {
@@ -99,13 +115,41 @@ impl Renderer {
     ///
     /// The engine is loaded once during initialization and reused for all subsequent renders.
     /// This prevents v8 isolate issues when rendering with different modes.
+    ///
+    /// # Arguments
+    /// * `config` - Optional configuration object with:
+    ///   - `maxCachedRenderers` - Maximum number of cached renderers (default: 4)
+    ///   - `maxBatchSize` - Maximum number of files in a batch request (default: 1000)
+    ///   - `maxMdxContentSize` - Maximum MDX content size per file in bytes (default: 10 MB)
+    ///   - `maxComponentCodeSize` - Maximum component code size in bytes (default: 1 MB)
     #[napi(constructor)]
-    pub fn new() -> Result<Self> {
+    pub fn new(config: Option<RendererConfig>) -> Result<Self> {
         let static_dir = init_static_dir()?;
+        let cfg = config.unwrap_or_default();
+
+        let mut resource_limits = dinja_core::models::ResourceLimits::default();
+        if let Some(v) = cfg.max_batch_size {
+            resource_limits.max_batch_size = v as usize;
+        }
+        if let Some(v) = cfg.max_mdx_content_size {
+            resource_limits.max_mdx_content_size = v as usize;
+        }
+        if let Some(v) = cfg.max_component_code_size {
+            resource_limits.max_component_code_size = v as usize;
+        }
+
+        // Validate resource limits
+        resource_limits.validate().map_err(|e| {
+            Error::new(
+                Status::InvalidArg,
+                format!("Invalid resource limits: {}", e),
+            )
+        })?;
+
         let config = RenderServiceConfig {
             static_dir,
-            max_cached_renderers: 4,
-            resource_limits: dinja_core::models::ResourceLimits::default(),
+            max_cached_renderers: cfg.max_cached_renderers.unwrap_or(4) as usize,
+            resource_limits,
         };
         let service = CoreRenderService::new(config).map_err(|e| {
             Error::new(
@@ -125,7 +169,10 @@ impl Renderer {
     ///   - `settings`: Object with `output` ("html", "javascript", "schema", or "json"),
     ///     `minify` (boolean)
     ///   - `mdx`: Object mapping file names to MDX content strings
-    ///   - `components`: Optional object mapping component names to component definitions
+    ///   - `components`: Optional object mapping component names to component definitions.
+    ///     Components can be specified as either:
+    ///     - Simple strings: `{ "Button": "function Component(props) { ... }" }`
+    ///     - Full objects: `{ "Button": { "code": "...", "docs": "..." } }`
     ///
     /// # Returns
     /// JSON string containing:
@@ -140,9 +187,26 @@ impl Renderer {
     /// - Throws `Error` if an internal error occurs during rendering
     #[napi]
     pub fn render(&self, input: String) -> Result<String> {
-        // Parse JSON string to Rust struct
-        let batch_input: dinja_core::models::NamedMdxBatchInput = serde_json::from_str(&input)
+        // Parse JSON to Value first to preprocess components
+        let mut json_value: serde_json::Value = serde_json::from_str(&input)
             .map_err(|e| Error::new(Status::InvalidArg, format!("Failed to parse input: {}", e)))?;
+
+        // Convert simplified component format (string) to full format ({ code: string })
+        if let Some(components) = json_value.get_mut("components") {
+            if let Some(components_obj) = components.as_object_mut() {
+                for (_name, value) in components_obj.iter_mut() {
+                    if let Some(code_str) = value.as_str() {
+                        *value = serde_json::json!({ "code": code_str });
+                    }
+                }
+            }
+        }
+
+        // Parse preprocessed JSON to Rust struct
+        let batch_input: dinja_core::models::NamedMdxBatchInput =
+            serde_json::from_value(json_value).map_err(|e| {
+                Error::new(Status::InvalidArg, format!("Failed to parse input: {}", e))
+            })?;
 
         // Call render_batch on the locked service
         let outcome = {

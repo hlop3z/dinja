@@ -122,17 +122,15 @@ result = renderer.render(
         mdx={"page.mdx": "<Greeting name='Alice' />"},
         settings=Settings(
             output="html",
-            utils="export default { greeting: 'Hello', emoji: '👋' }"
+            utils="export default { greeting: 'Hello', emoji: '👋' }",
         ),
         components={
-            "Greeting": {
-                "code": """
-                    export default function Component(props) {
-                        return <div>{utils.greeting} {props.name} {utils.emoji}</div>;
-                    }
-                """
-            }
-        }
+            "Greeting": """
+                export default function Component(props) {
+                    return <div>{utils.greeting} {props.name} {utils.emoji}</div>;
+                }
+            """,
+        },
     )
 )
 ```

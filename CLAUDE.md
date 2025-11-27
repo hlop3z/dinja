@@ -19,6 +19,7 @@ All builds use the centralized script `./utils/build.sh`:
 ```
 
 JavaScript bindings (not integrated with build.sh):
+
 ```bash
 cd js-bindings && npm run build
 ```
@@ -32,11 +33,13 @@ cd js-bindings && npm test       # Run JavaScript tests
 ```
 
 Run a single Rust test:
+
 ```bash
 cargo test -p dinja-core test_name
 ```
 
 Run a single Python test:
+
 ```bash
 uv run pytest python-bindings/tests/test_render.py::test_name -v
 ```
@@ -74,10 +77,12 @@ MDX Content → Extract YAML Frontmatter (gray_matter) → Markdown to HTML (mar
 
 **Embedded Static Assets**: JavaScript engine code (`engine.min.js`, etc.) is embedded via `include_str!` and extracted to a temp directory on first use. See `core/static/`.
 
-**Resource Limits**: Prevents memory exhaustion with configurable limits:
+**Resource Limits**: Prevents memory exhaustion with configurable limits (all configurable via `Renderer` constructor in Python/JS):
+
 - `max_batch_size`: Default 1000
 - `max_mdx_content_size`: Default 10 MB
 - `max_component_code_size`: Default 1 MB
+- `max_cached_renderers`: Default 4
 
 ### Output Formats
 

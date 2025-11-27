@@ -86,10 +86,10 @@ html_result = renderer.render(
         mdx={"page.mdx": mdx_content},
         settings=Settings(output="html"),
         components={
-            "Alert": {"code": "function Component(props) { return <div class={'alert-' + props.type}>{props.children}</div>; }"},
-            "Card": {"code": "function Component(props) { return <div class='card'><h3>{props.title}</h3>{props.children}</div>; }"},
-            "Button": {"code": "function Component(props) { return <button class={props.primary ? 'btn-primary' : 'btn'}>{props.children}</button>; }"},
-        }
+            "Alert": "function Component(props) { return <div class={'alert-' + props.type}>{props.children}</div>; }",
+            "Card": "function Component(props) { return <div class='card'><h3>{props.title}</h3>{props.children}</div>; }",
+            "Button": "function Component(props) { return <button class={props.primary ? 'btn-primary' : 'btn'}>{props.children}</button>; }",
+        },
     )
 )
 print(html_result["files"]["page.mdx"]["result"]["output"])
@@ -120,10 +120,10 @@ json_result = renderer.render(
         mdx={"page.mdx": mdx_content},
         settings=Settings(output="json"),
         components={
-            "Alert": {"code": "function Component(props) { return <div>{props.children}</div>; }"},
-            "Card": {"code": "function Component(props) { return <div>{props.children}</div>; }"},
-            "Button": {"code": "function Component(props) { return <button>{props.children}</button>; }"},
-        }
+            "Alert": "function Component(props) { return <div>{props.children}</div>; }",
+            "Card": "function Component(props) { return <div>{props.children}</div>; }",
+            "Button": "function Component(props) { return <button>{props.children}</button>; }",
+        },
     )
 )
 # Output: JSON tree structure

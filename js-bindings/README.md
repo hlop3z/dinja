@@ -123,15 +123,12 @@ import { Button } from './button';
     `
   },
   components: {
-    Button: {
-      name: 'Button',
-      code: `
+    Button: `
 export default function Component({ children }) {
   return <button class="custom-btn">{children}</button>;
 }
-      `
-    }
-  }
+    `,
+  },
 });
 ```
 
@@ -200,21 +197,18 @@ const result = renderer.render({
   settings: {
     output: 'html',
     minify: false,
-    utils: "export default { greeting: 'Hello', emoji: '👋' }"
+    utils: "export default { greeting: 'Hello', emoji: '👋' }",
   },
   mdx: {
-    'page.mdx': '<Greeting name="Alice" />'
+    'page.mdx': '<Greeting name="Alice" />',
   },
   components: {
-    Greeting: {
-      name: 'Greeting',
-      code: `
-        export default function Component(props) {
-          return <div>{utils.greeting} {props.name} {utils.emoji}</div>;
-        }
-      `
-    }
-  }
+    Greeting: `
+      export default function Component(props) {
+        return <div>{utils.greeting} {props.name} {utils.emoji}</div>;
+      }
+    `,
+  },
 });
 ```
 
@@ -227,10 +221,24 @@ The `utils` object must be exported using `export default { ... }` and will be a
 #### Constructor
 
 ```typescript
-new Renderer()
+new Renderer(config?: RendererConfig)
 ```
 
 Creates a new Renderer instance. The engine is loaded once during initialization and reused for all subsequent renders.
+
+**Optional config:**
+- `maxCachedRenderers`: Maximum number of cached renderers (default: 4)
+- `maxBatchSize`: Maximum number of files in a batch request (default: 1000)
+- `maxMdxContentSize`: Maximum MDX content size per file in bytes (default: 10 MB)
+- `maxComponentCodeSize`: Maximum component code size in bytes (default: 1 MB)
+
+```javascript
+// With custom limits
+const renderer = new Renderer({
+  maxBatchSize: 500,
+  maxMdxContentSize: 5 * 1024 * 1024, // 5 MB
+});
+```
 
 #### `render(input: RenderInput): RenderResult`
 

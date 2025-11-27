@@ -79,13 +79,42 @@ impl Renderer {
     ///
     /// The engine is loaded once during initialization and reused for all subsequent renders.
     /// This prevents v8 isolate issues when rendering with different modes.
+    ///
+    /// # Arguments
+    /// * `max_cached_renderers` - Maximum number of cached renderers (default: 4)
+    /// * `max_batch_size` - Maximum number of files in a batch request (default: 1000)
+    /// * `max_mdx_content_size` - Maximum MDX content size per file in bytes (default: 10 MB)
+    /// * `max_component_code_size` - Maximum component code size in bytes (default: 1 MB)
     #[new]
-    fn new() -> PyResult<Self> {
+    #[pyo3(signature = (max_cached_renderers=None, max_batch_size=None, max_mdx_content_size=None, max_component_code_size=None))]
+    fn new(
+        max_cached_renderers: Option<usize>,
+        max_batch_size: Option<usize>,
+        max_mdx_content_size: Option<usize>,
+        max_component_code_size: Option<usize>,
+    ) -> PyResult<Self> {
         let static_dir = init_static_dir()?;
+
+        let mut resource_limits = dinja_core::models::ResourceLimits::default();
+        if let Some(v) = max_batch_size {
+            resource_limits.max_batch_size = v;
+        }
+        if let Some(v) = max_mdx_content_size {
+            resource_limits.max_mdx_content_size = v;
+        }
+        if let Some(v) = max_component_code_size {
+            resource_limits.max_component_code_size = v;
+        }
+
+        // Validate resource limits
+        resource_limits
+            .validate()
+            .map_err(|e| PyValueError::new_err(format!("Invalid resource limits: {}", e)))?;
+
         let config = RenderServiceConfig {
             static_dir,
-            max_cached_renderers: 4,
-            resource_limits: dinja_core::models::ResourceLimits::default(),
+            max_cached_renderers: max_cached_renderers.unwrap_or(4),
+            resource_limits,
         };
         let service = CoreRenderService::new(config).map_err(|e| {
             PyValueError::new_err(format!("Failed to create render service: {}", e))

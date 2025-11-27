@@ -218,6 +218,12 @@ class Renderer:
         # Create a renderer with default retry settings (3 retries)
         renderer = Renderer()
 
+        # Create a renderer with custom resource limits
+        renderer = Renderer(
+            max_batch_size=500,
+            max_mdx_content_size=5 * 1024 * 1024,  # 5 MB
+        )
+
         # Option 1: Use dataclasses (type-safe)
         input_data = Input(
             mdx={"page.mdx": "# Hello"},
@@ -236,6 +242,10 @@ class Renderer:
         max_retries: Maximum number of retry attempts (default: 3)
         retry_delay: Initial delay between retries in seconds (default: 0.05)
         backoff_factor: Multiplier for exponential backoff (default: 1.5)
+        max_cached_renderers: Maximum number of cached renderers (default: 4)
+        max_batch_size: Maximum number of files in a batch request (default: 1000)
+        max_mdx_content_size: Maximum MDX content size per file in bytes (default: 10 MB)
+        max_component_code_size: Maximum component code size in bytes (default: 1 MB)
     """
 
     def __init__(
@@ -243,9 +253,19 @@ class Renderer:
         max_retries: int = 3,
         retry_delay: float = 0.05,
         backoff_factor: float = 1.5,
+        *,
+        max_cached_renderers: int | None = None,
+        max_batch_size: int | None = None,
+        max_mdx_content_size: int | None = None,
+        max_component_code_size: int | None = None,
     ) -> None:
-        """Initialize the renderer with retry configuration."""
-        self._renderer = _NativeRenderer()
+        """Initialize the renderer with retry and resource limit configuration."""
+        self._renderer = _NativeRenderer(
+            max_cached_renderers=max_cached_renderers,
+            max_batch_size=max_batch_size,
+            max_mdx_content_size=max_mdx_content_size,
+            max_component_code_size=max_component_code_size,
+        )
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.backoff_factor = backoff_factor
