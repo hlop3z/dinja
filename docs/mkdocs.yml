@@ -1,15 +1,26 @@
-site_name: Dinja Documentation
+
+site_name: Dinja
 site_description: Safe, deterministic MDX rendering powered by a Rust core with batteries-included Python bindings
 site_url: https://hlop3z.github.io/dinja
 repo_url: https://github.com/hlop3z/dinja
 repo_name: hlop3z/dinja
 edit_uri: edit/main/docs/docs/
 docs_dir: docs
+copyright: Copyright © hlop3z
+
+# Path Watch
+watch:
+  - custom_theme
+
+# Extras
+extra:
+  generator: false
 
 theme:
   name: material
   logo: assets/media/logo.png
   favicon: assets/media/logo.png
+  custom_dir: custom_theme/
   palette:
     # Light mode
     - scheme: default
@@ -83,6 +94,4 @@ nav:
     - Contributing: development/contributing.md
     - Building: development/building.md
     - Testing: development/testing.md
-
-copyright: Copyright &copy; 2025 Dinja Contributors
 

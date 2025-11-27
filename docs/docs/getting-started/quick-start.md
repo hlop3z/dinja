@@ -149,7 +149,7 @@ println!("{}", html);  // <h1>Hello World</h1>...
 
 ## Next Steps
 
-- Learn about [Output Formats](output-formats.md)
-- Explore [Component Support](components.md)
+- Learn about [Output Formats](../guides/output-formats.md)
+- Explore [Component Support](../guides/components.md)
 - Check out the [Python API Reference](../python/overview.md)
 

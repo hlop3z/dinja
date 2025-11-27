@@ -4,6 +4,12 @@ version = "0.0.0"
 requires-python = ">=3.13"
 dependencies = [
     "cyclopts>=2.9",
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.32",
+    "mkdocs-macros-plugin>=1.0.5",
+    "mkdocstrings[python]>=0.25.2",
+    "termynal>=0.12.1",
+    "mkdocs-minify-plugin>=0.7.0",
 ]
 
 [tool.uv.workspace]

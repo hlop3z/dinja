@@ -10,3 +10,9 @@ dependencies = [
     "pymdown-extensions>=10.0.0",
 ]
 
+[tool.setuptools]
+packages = ["mkdocs_plugins"]
+
+[tool.setuptools.package-data]
+"*" = ["*.py"]
+

@@ -137,7 +137,6 @@ name = "dinja-docs"
 version = "0.1.0"
 source = { virtual = "docs" }
 dependencies = [
-    { name = "mkdocs-macros-plugin" },
     { name = "mkdocs-material" },
     { name = "mkdocs-minify-plugin" },
     { name = "pymdown-extensions" },
@@ -145,7 +144,6 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "mkdocs-macros-plugin", specifier = ">=1.0.0" },
     { name = "mkdocs-material", specifier = ">=9.5.0" },
     { name = "mkdocs-minify-plugin", specifier = ">=0.7.0" },
     { name = "pymdown-extensions", specifier = ">=10.0.0" },
@@ -157,10 +155,24 @@ version = "0.0.0"
 source = { virtual = "." }
 dependencies = [
     { name = "cyclopts" },
+    { name = "mkdocs" },
+    { name = "mkdocs-macros-plugin" },
+    { name = "mkdocs-material" },
+    { name = "mkdocs-minify-plugin" },
+    { name = "mkdocstrings", extra = ["python"] },
+    { name = "termynal" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "cyclopts", specifier = ">=2.9" }]
+requires-dist = [
+    { name = "cyclopts", specifier = ">=2.9" },
+    { name = "mkdocs", specifier = ">=1.6.0" },
+    { name = "mkdocs-macros-plugin", specifier = ">=1.0.5" },
+    { name = "mkdocs-material", specifier = ">=9.5.32" },
+    { name = "mkdocs-minify-plugin", specifier = ">=0.7.0" },
+    { name = "mkdocstrings", extras = ["python"], specifier = ">=0.25.2" },
+    { name = "termynal", specifier = ">=0.12.1" },
+]
 
 [[package]]
 name = "docstring-parser"
@@ -190,6 +202,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d9/29/d40217cbe2f6b1359e00c6c307bb3fc876ba74068cbab3dde77f03ca0dc4/ghp-import-2.1.0.tar.gz", hash = "sha256:9c535c4c61193c2df8871222567d7fd7e5014d835f97dc7b7439069e2413d343", size = 10943, upload-time = "2022-05-02T15:47:16.11Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f7/ec/67fbef5d497f86283db54c22eec6f6140243aae73265799baaaa19cd17fb/ghp_import-2.1.0-py3-none-any.whl", hash = "sha256:8337dd7b50877f163d4c0289bc1f1c7f127550241988d568c1db512c4324a619", size = 11034, upload-time = "2022-05-02T15:47:14.552Z" },
+]
+
+[[package]]
+name = "griffe"
+version = "1.15.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0d/0c/3a471b6e31951dce2360477420d0a8d1e00dea6cf33b70f3e8c3ab6e28e1/griffe-1.15.0.tar.gz", hash = "sha256:7726e3afd6f298fbc3696e67958803e7ac843c1cfe59734b6251a40cdbfb5eea", size = 424112, upload-time = "2025-11-10T15:03:15.52Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9c/83/3b1d03d36f224edded98e9affd0467630fc09d766c0e56fb1498cbb04a9b/griffe-1.15.0-py3-none-any.whl", hash = "sha256:6f6762661949411031f5fcda9593f586e6ce8340f0ba88921a0f2ef7a81eb9a3", size = 150705, upload-time = "2025-11-10T15:03:13.549Z" },
 ]
 
 [[package]]
@@ -352,6 +376,20 @@ wheels = [
 ]
 
 [[package]]
+name = "mkdocs-autorefs"
+version = "1.4.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markdown" },
+    { name = "markupsafe" },
+    { name = "mkdocs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/51/fa/9124cd63d822e2bcbea1450ae68cdc3faf3655c69b455f3a7ed36ce6c628/mkdocs_autorefs-1.4.3.tar.gz", hash = "sha256:beee715b254455c4aa93b6ef3c67579c399ca092259cc41b7d9342573ff1fc75", size = 55425, upload-time = "2025-08-26T14:23:17.223Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9f/4d/7123b6fa2278000688ebd338e2a06d16870aaf9eceae6ba047ea05f92df1/mkdocs_autorefs-1.4.3-py3-none-any.whl", hash = "sha256:469d85eb3114801d08e9cc55d102b3ba65917a869b893403b8987b601cf55dc9", size = 25034, upload-time = "2025-08-26T14:23:15.906Z" },
+]
+
+[[package]]
 name = "mkdocs-get-deps"
 version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -430,6 +468,42 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/52/67/fe4b77e7a8ae7628392e28b14122588beaf6078b53eb91c7ed000fd158ac/mkdocs-minify-plugin-0.8.0.tar.gz", hash = "sha256:bc11b78b8120d79e817308e2b11539d790d21445eb63df831e393f76e52e753d", size = 8366, upload-time = "2024-01-29T16:11:32.982Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1b/cd/2e8d0d92421916e2ea4ff97f10a544a9bd5588eb747556701c983581df13/mkdocs_minify_plugin-0.8.0-py3-none-any.whl", hash = "sha256:5fba1a3f7bd9a2142c9954a6559a57e946587b21f133165ece30ea145c66aee6", size = 6723, upload-time = "2024-01-29T16:11:31.851Z" },
+]
+
+[[package]]
+name = "mkdocstrings"
+version = "0.30.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jinja2" },
+    { name = "markdown" },
+    { name = "markupsafe" },
+    { name = "mkdocs" },
+    { name = "mkdocs-autorefs" },
+    { name = "pymdown-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c5/33/2fa3243439f794e685d3e694590d28469a9b8ea733af4b48c250a3ffc9a0/mkdocstrings-0.30.1.tar.gz", hash = "sha256:84a007aae9b707fb0aebfc9da23db4b26fc9ab562eb56e335e9ec480cb19744f", size = 106350, upload-time = "2025-09-19T10:49:26.446Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7b/2c/f0dc4e1ee7f618f5bff7e05898d20bf8b6e7fa612038f768bfa295f136a4/mkdocstrings-0.30.1-py3-none-any.whl", hash = "sha256:41bd71f284ca4d44a668816193e4025c950b002252081e387433656ae9a70a82", size = 36704, upload-time = "2025-09-19T10:49:24.805Z" },
+]
+
+[package.optional-dependencies]
+python = [
+    { name = "mkdocstrings-python" },
+]
+
+[[package]]
+name = "mkdocstrings-python"
+version = "1.19.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "griffe" },
+    { name = "mkdocs-autorefs" },
+    { name = "mkdocstrings" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/75/1c/3af8413919b0839b96a78f60e8bd0dfd26c844d3717eeb77f80b43f5be1c/mkdocstrings_python-1.19.0.tar.gz", hash = "sha256:917aac66cf121243c11db5b89f66b0ded6c53ec0de5318ff5e22424eb2f2e57c", size = 204010, upload-time = "2025-11-10T13:30:55.915Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/98/5c/2597cef67b6947b15c47f8dba967a0baf19fbdfdc86f6e4a8ba7af8b581a/mkdocstrings_python-1.19.0-py3-none-any.whl", hash = "sha256:395c1032af8f005234170575cc0c5d4d20980846623b623b35594281be4a3059", size = 143417, upload-time = "2025-11-10T13:30:54.164Z" },
 ]
 
 [[package]]
@@ -619,6 +693,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/87/56/ab275c2b56a5e2342568838f0d5e3e66a32354adcc159b495e374cda43f5/termcolor-3.2.0.tar.gz", hash = "sha256:610e6456feec42c4bcd28934a8c87a06c3fa28b01561d46aa09a9881b8622c58", size = 14423, upload-time = "2025-10-25T19:11:42.586Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f9/d5/141f53d7c1eb2a80e6d3e9a390228c3222c27705cbe7f048d3623053f3ca/termcolor-3.2.0-py3-none-any.whl", hash = "sha256:a10343879eba4da819353c55cb8049b0933890c2ebf9ad5d3ecd2bb32ea96ea6", size = 7698, upload-time = "2025-10-25T19:11:41.536Z" },
+]
+
+[[package]]
+name = "termynal"
+version = "0.13.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markdown" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6c/a6/099ed030e3e534ec91aec84dfe2cb11cea6ec8dcbec454fe569cdbbb4888/termynal-0.13.1.tar.gz", hash = "sha256:c7abecfdbda3ccdeee2723049a70f0e2e7f63e1973bb9b8f0b3fe6c1bfb391cd", size = 174253, upload-time = "2025-09-01T13:03:35.02Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/80/72/6949a512f16653cecebb737b8512ee76ca078d8e0e4e948d7322b528fb4d/termynal-0.13.1-py3-none-any.whl", hash = "sha256:7a1605a4d4ed38bf851bf25f842aafa52ef29786d52762aecee59622ed030592", size = 10628, upload-time = "2025-09-01T13:03:34.236Z" },
 ]
 
 [[package]]

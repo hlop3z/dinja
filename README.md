@@ -2,6 +2,14 @@
 
 ![Dinja Logo](docs/docs/assets/media/logo.png)
 
+[![License](https://img.shields.io/github/license/hlop3z/dinja?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/pypi/v/dinja?style=flat-square)](https://pypi.org/project/dinja/)
+[![Rust](https://img.shields.io/crates/v/dinja-core?style=flat-square)](https://crates.io/crates/dinja-core)
+[![Python Version](https://img.shields.io/pypi/pyversions/dinja?style=flat-square)](https://pypi.org/project/dinja/)
+[![GitHub stars](https://img.shields.io/github/stars/hlop3z/dinja?style=flat-square)](https://github.com/hlop3z/dinja/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/hlop3z/dinja?style=flat-square)](https://github.com/hlop3z/dinja/issues)
+[![GitHub forks](https://img.shields.io/github/forks/hlop3z/dinja?style=flat-square)](https://github.com/hlop3z/dinja/network/members)
+
 </div>
 
 # Dinja
