@@ -1,6 +1,6 @@
 # Development Environment Setup
 
-Set up or verify the development environment for dinja.
+Set up or verify the development environment for dinja using the centralized build script.
 
 ## Arguments
 - `$ARGUMENTS` - Action: `check` (default), `install`, or `full`
@@ -29,10 +29,11 @@ Install/update development dependencies:
    rustup update
    ```
 
-2. **Python bindings:**
+2. **Python bindings (using build.sh):**
    ```bash
-   cd python-bindings && uv sync --dev
+   ./utils/build.sh dev
    ```
+   This handles virtualenv creation, maturin installation via uv, and development mode installation.
 
 3. **JavaScript bindings:**
    ```bash
@@ -41,14 +42,26 @@ Install/update development dependencies:
 
 ### For `full`:
 Complete setup including building all components:
-1. Run all `install` steps
-2. Build core: `cargo build --release -p dinja`
-3. Build Python: `cd python-bindings && maturin develop --release`
-4. Build JS: `cd js-bindings && npm run build`
-5. Run all tests to verify
+```bash
+./utils/build.sh all
+```
+This runs build, test, and dev mode setup in sequence.
+
+## build.sh Commands Reference
+| Command | Description |
+|---------|-------------|
+| `./utils/build.sh help` | Show all available commands |
+| `./utils/build.sh build` | Build Rust workspace |
+| `./utils/build.sh build-core` | Build core only (no Python) |
+| `./utils/build.sh test` | Run all tests |
+| `./utils/build.sh test-core` | Run core tests only |
+| `./utils/build.sh dev` | Install Python bindings in dev mode |
+| `./utils/build.sh build-python` | Build Python wheels |
+| `./utils/build.sh clean` | Clean build artifacts |
+| `./utils/build.sh all` | Build, test, and install dev mode |
 
 ## Required Tools
 - Rust 1.75+ (with cargo)
-- Python 3.13+ (with uv package manager)
+- Python 3.13+ (with uv package manager recommended)
 - Node.js 18+ (with npm)
-- maturin (for Python bindings)
+- uv (https://github.com/astral-sh/uv) - handles maturin and Python env automatically

@@ -4,6 +4,9 @@
 # Stage 1: Builder - Build the Rust binary
 FROM rust:slim-bookworm AS builder
 
+# Version can be passed as build argument (defaults to 0.0.0 for local builds)
+ARG VERSION=0.0.0
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
@@ -21,7 +24,7 @@ RUN printf '%s\n' \
     'resolver = "2"' \
     '' \
     '[workspace.package]' \
-    'version = "0.3.1"' \
+    "version = \"${VERSION}\"" \
     'edition = "2021"' \
     'authors = ["dinja contributors"]' \
     'license = "BSD-3-Clause"' \
