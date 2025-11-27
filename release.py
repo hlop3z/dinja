@@ -493,15 +493,33 @@ def release(
             print("[DEBUG] Dry run mode: skipping actual git operations")
         return
 
-    if debug:
-        print(f"[DEBUG] Creating git tag: {tag}")
-    run_cmd(["git", "tag", "-a", tag, "-m", f"release: v{expected}"], debug=debug)
-    # Write VERSION file with the released version
+    # Write VERSION file with the released version (before creating tag)
     version_file = ROOT / "VERSION"
     if debug:
         print(f"[DEBUG] Writing VERSION file: {version_file}")
+    old_content = (
+        version_file.read_text(encoding="utf-8").strip()
+        if version_file.exists()
+        else None
+    )
     version_file.write_text(f"{expected}\n", encoding="utf-8")
-    print(f"Created VERSION file with version {expected}")
+
+    # Commit VERSION file if it changed or is new
+    version_file_changed = old_content != expected
+    if version_file_changed:
+        if debug:
+            print("[DEBUG] VERSION file changed, committing...")
+        run_cmd(["git", "add", str(version_file)], debug=debug)
+        run_cmd(
+            ["git", "commit", "-m", f"chore: update VERSION to {expected}"], debug=debug
+        )
+        print(f"Committed VERSION file with version {expected}")
+    elif debug:
+        print("[DEBUG] VERSION file unchanged, skipping commit")
+
+    if debug:
+        print(f"[DEBUG] Creating git tag: {tag}")
+    run_cmd(["git", "tag", "-a", tag, "-m", f"release: v{expected}"], debug=debug)
 
     if no_push:
         print("Skipping git push (--no-push flag provided).")
