@@ -10,11 +10,12 @@ Release utilities for the dinja workspace, implemented with Cyclopts.
 
 Commands:
 
-  * bump: update version strings for the Rust workspace and/or Python bindings.
+  * bump: update version strings for the Rust workspace, Python bindings, and/or JavaScript bindings.
           Examples:
-              uv run release.py bump --version 0.3.0          # update both (use --version flag)
-              uv run release.py bump --python-version 0.2.5   # python only
-              uv run release.py bump --rust-version 0.2.1     # rust only
+              uv run release.py bump --version 0.3.0              # update all (use --version flag)
+              uv run release.py bump --python-version 0.2.5       # python only
+              uv run release.py bump --rust-version 0.2.1         # rust only
+              uv run release.py bump --javascript-version 0.1.5   # javascript only
 
   * release: run the validation pipeline and create a git tag that triggers the
              GitHub Actions release workflow (same behavior as the former shell
@@ -40,6 +41,7 @@ Parameter = cyclopts_module.Parameter
 
 ROOT = Path(__file__).resolve().parent
 PYTHON_BINDINGS = ROOT / "python-bindings"
+JS_BINDINGS = ROOT / "js-bindings"
 
 
 class ReleaseError(RuntimeError):
@@ -56,6 +58,13 @@ class VersionField:
 def _compile_version_pattern(lhs: str) -> re.Pattern[str]:
     return re.compile(
         rf'(?m)^(?P<prefix>\s*{re.escape(lhs)}\s*=\s*")(?P<value>[^"]+)(?P<suffix>")'
+    )
+
+
+def _compile_json_version_pattern(lhs: str) -> re.Pattern[str]:
+    """Compile a pattern for JSON files (uses colon instead of equals)."""
+    return re.compile(
+        rf'(?m)^(?P<prefix>\s*"{re.escape(lhs)}"\s*:\s*")(?P<value>[^"]+)(?P<suffix>")'
     )
 
 
@@ -77,6 +86,13 @@ VERSION_FIELDS: Dict[str, tuple[VersionField, ...]] = {
             path=PYTHON_BINDINGS / "dinja" / "__about__.py",
             pattern=_compile_version_pattern("__version__"),
             label="python-bindings/dinja/__about__.py",
+        ),
+    ),
+    "javascript": (
+        VersionField(
+            path=JS_BINDINGS / "package.json",
+            pattern=_compile_json_version_pattern("version"),
+            label="js-bindings/package.json",
         ),
     ),
 }
@@ -110,11 +126,11 @@ def _replace_in_field(field: VersionField, new_version: str, dry_run: bool) -> b
 
 
 def update_versions(
-    *, rust: Optional[str], python: Optional[str], dry_run: bool
+    *, rust: Optional[str], python: Optional[str], javascript: Optional[str], dry_run: bool
 ) -> bool:
-    if not rust and not python:
+    if not rust and not python and not javascript:
         raise ReleaseError(
-            "At least one of --rust-version or --python-version is required."
+            "At least one of --rust-version, --python-version, or --javascript-version is required."
         )
 
     changed = False
@@ -124,6 +140,9 @@ def update_versions(
     if python:
         for field in VERSION_FIELDS["python"]:
             changed |= _replace_in_field(field, python, dry_run)
+    if javascript:
+        for field in VERSION_FIELDS["javascript"]:
+            changed |= _replace_in_field(field, javascript, dry_run)
     return changed
 
 
@@ -271,21 +290,30 @@ app = App(help=__doc__, version_flags="")
 
 
 def _default_commit_message(
-    *, rust_version: str | None, python_version: str | None
+    *, rust_version: str | None, python_version: str | None, javascript_version: str | None
 ) -> str:
     components = []
     if rust_version:
         components.append(("rust", rust_version))
     if python_version:
         components.append(("python", python_version))
+    if javascript_version:
+        components.append(("javascript", javascript_version))
 
     unique_versions = {version for _, version in components}
     component_labels = "/".join(name for name, _ in components)
 
     if len(unique_versions) == 1:
         version = next(iter(unique_versions))
-        if component_labels in {"rust/python", "python/rust"}:
+        # Special case for all three components
+        if len(components) == 3:
+            label = "rust+python+javascript"
+        elif component_labels in {"rust/python", "python/rust"}:
             label = "rust+python"
+        elif component_labels in {"rust/javascript", "javascript/rust"}:
+            label = "rust+javascript"
+        elif component_labels in {"python/javascript", "javascript/python"}:
+            label = "python+javascript"
         else:
             label = component_labels
         return f"chore: bump {label} to v{version}"
@@ -300,7 +328,7 @@ def bump(
         str | None,
         Parameter(
             name="--version",
-            help="Version applied to both the Rust workspace and Python bindings.",
+            help="Version applied to Rust workspace, Python bindings, and JavaScript bindings.",
         ),
     ] = None,
     rust_version: Annotated[
@@ -308,6 +336,9 @@ def bump(
     ] = None,
     python_version: Annotated[
         str | None, Parameter(help="Version applied only to the Python bindings.")
+    ] = None,
+    javascript_version: Annotated[
+        str | None, Parameter(help="Version applied only to the JavaScript bindings.")
     ] = None,
     dry_run: Annotated[
         bool, Parameter(help="Show planned edits without touching the files.")
@@ -328,18 +359,20 @@ def bump(
         print(f"[DEBUG] target_version: {target_version!r}")
         print(f"[DEBUG] rust_version: {rust_version!r}")
         print(f"[DEBUG] python_version: {python_version!r}")
+        print(f"[DEBUG] javascript_version: {javascript_version!r}")
         print(f"[DEBUG] dry_run: {dry_run}")
         print(f"[DEBUG] commit: {commit}")
 
     rust_version = rust_version or target_version
     python_version = python_version or target_version
-    if not rust_version and not python_version:
+    javascript_version = javascript_version or target_version
+    if not rust_version and not python_version and not javascript_version:
         raise ReleaseError(
-            "Specify --version for both components or at least one of "
-            "--rust-version / --python-version."
+            "Specify --version for all components or at least one of "
+            "--rust-version / --python-version / --javascript-version."
         )
 
-    changed = update_versions(rust=rust_version, python=python_version, dry_run=dry_run)
+    changed = update_versions(rust=rust_version, python=python_version, javascript=javascript_version, dry_run=dry_run)
     if not changed:
         print("No files were updated.")
         if debug:
@@ -354,7 +387,7 @@ def bump(
         return
 
     msg = commit_message or _default_commit_message(
-        rust_version=rust_version, python_version=python_version
+        rust_version=rust_version, python_version=python_version, javascript_version=javascript_version
     )
     if debug:
         print(f"[DEBUG] Commit message: {msg}")
@@ -408,8 +441,8 @@ def release(
             print(f"[DEBUG] Version mismatch detected: {mismatch_lines}")
             print(f"[DEBUG] Automatically updating all versions to {expected}...")
 
-        # Automatically update versions (both rust and python)
-        changed = update_versions(rust=expected, python=expected, dry_run=dry_run)
+        # Automatically update versions (rust, python, and javascript)
+        changed = update_versions(rust=expected, python=expected, javascript=expected, dry_run=dry_run)
         if changed:
             version_updated = True
             if dry_run:
@@ -418,7 +451,7 @@ def release(
                 print(f"Updated all versions to {expected}")
                 # Commit the version bump automatically
                 msg = _default_commit_message(
-                    rust_version=expected, python_version=expected
+                    rust_version=expected, python_version=expected, javascript_version=expected
                 )
                 if debug:
                     print(f"[DEBUG] Committing version bump: {msg}")
@@ -429,6 +462,7 @@ def release(
                         "Cargo.toml",
                         "python-bindings/pyproject.toml",
                         "python-bindings/dinja/__about__.py",
+                        "js-bindings/package.json",
                     ],
                     debug=debug,
                 )
