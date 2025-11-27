@@ -102,6 +102,21 @@ MDX Content → Extract YAML Frontmatter (gray_matter) → Markdown to HTML (mar
 
 Version is managed in `VERSION` file and synced to workspace `Cargo.toml`. The release script `release.py` handles version bumping and tagging. CI/CD publishes to PyPI, npm, crates.io, and Docker Hub on tag push.
 
+## Git Hooks
+
+Install pre-commit hooks for automatic checks before commits:
+
+```bash
+./hooks/install.sh
+```
+
+The pre-commit hook runs:
+- Rust formatting check (`cargo fmt`)
+- Clippy linting (`cargo clippy -p dinja-core`)
+- Core tests (`cargo test -p dinja-core`)
+- Unused dependency check (if `cargo-machete` installed)
+- Python/JS checks (if those bindings are modified)
+
 ## Requirements
 
 - Rust (stable)
