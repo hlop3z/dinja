@@ -2,7 +2,7 @@
 # Creates a minimal Docker image using scratch base (~10MB final image)
 
 # Stage 1: Builder - Build the Rust binary
-FROM rust:1.83-slim-bookworm AS builder
+FROM rust:latest AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -20,23 +20,23 @@ COPY Cargo.toml Cargo.lock ./
 COPY core ./core
 COPY python-bindings ./python-bindings
 
-# Build the HTTP server with release optimizations and static linking
-# Target x86_64-unknown-linux-musl for fully static binary
-RUN rustup target add x86_64-unknown-linux-musl && \
-    cargo build --release \
-    --target x86_64-unknown-linux-musl \
+# Build the HTTP server with release optimizations
+RUN cargo build --release \
     --features http \
     --package dinja-core \
     --bin dinja-core
 
-# Stage 2: Runtime - Minimal scratch-based image
-FROM scratch
+# Stage 2: Runtime - Minimal debian-slim image
+FROM debian:trixie-slim
 
-# Copy CA certificates for HTTPS (if needed)
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy the static binary
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/dinja-core /dinja-core
+# Copy the binary
+COPY --from=builder /app/target/release/dinja-core /usr/local/bin/dinja-core
 
 # Copy static files (JavaScript libraries)
 COPY core/static /static
@@ -49,4 +49,4 @@ ENV PORT=8080
 EXPOSE 8080
 
 # Run the server
-ENTRYPOINT ["/dinja-core"]
+ENTRYPOINT ["dinja-core"]
