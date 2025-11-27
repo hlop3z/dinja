@@ -87,9 +87,30 @@ result2 = renderer.render(
 )
 ```
 
-`rendered["output"]` contains HTML, JavaScript, or schema code depending on `settings.output`.
+### Accessing Metadata in MDX
 
-More examples live in `python-bindings/examples/`.
+Metadata from YAML frontmatter is available via the `context` function:
+
+```python
+result = renderer.render(
+    Input(
+        mdx={
+            "page.mdx": """
+---
+title: Welcome
+author: Alice
+---
+# {context('title')}
+
+By {context('author')}
+"""
+        },
+        settings=Settings(output="html"),
+    )
+)
+```
+
+The `context` function supports nested paths: `context('author.name')` for nested metadata.
 
 ### Using Global Utils
 
@@ -117,6 +138,10 @@ result = renderer.render(
 ```
 
 The `utils` object must be exported using `export default { ... }` and will be available globally as `utils` in all component code. Invalid utils code is silently ignored.
+
+`rendered["output"]` contains HTML, JavaScript, or schema code depending on `settings.output`.
+
+More examples live in `python-bindings/examples/`.
 
 ## License
 
