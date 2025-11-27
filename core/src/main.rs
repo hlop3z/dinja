@@ -28,6 +28,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(service.clone()))
+            .service(handlers::health)
             .service(handlers::render)
     })
     .bind(&bind_addr)?

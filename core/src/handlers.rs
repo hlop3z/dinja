@@ -5,7 +5,7 @@ use crate::models::NamedMdxBatchInput;
 #[cfg(feature = "http")]
 use crate::service::{RenderBatchError, RenderService};
 #[cfg(feature = "http")]
-use actix_web::{http::StatusCode, post, web, HttpResponse, Responder};
+use actix_web::{get, http::StatusCode, post, web, HttpResponse, Responder};
 #[cfg(feature = "http")]
 use serde_json::json;
 
@@ -37,6 +37,15 @@ pub async fn render(
             error_response(StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
         }
     }
+}
+
+/// Health check endpoint
+#[cfg(feature = "http")]
+#[get("/health")]
+pub async fn health() -> impl Responder {
+    HttpResponse::Ok()
+        .content_type("application/json")
+        .json(json!({ "status": "ok" }))
 }
 
 /// Helper function to create error responses with consistent formatting
