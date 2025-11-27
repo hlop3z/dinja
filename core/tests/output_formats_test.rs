@@ -77,10 +77,8 @@ fn test_html_output_with_frontmatter() {
     let service = create_test_service();
 
     let mut mdx_files = HashMap::new();
-    let mdx_content = create_mdx_with_frontmatter(
-        "Test Page",
-        "# {context('title')}\n\nContent here.",
-    );
+    let mdx_content =
+        create_mdx_with_frontmatter("Test Page", "# {context('title')}\n\nContent here.");
     mdx_files.insert("with_frontmatter.mdx".to_string(), mdx_content);
 
     let input = NamedMdxBatchInput {
@@ -110,10 +108,16 @@ fn test_html_output_with_frontmatter() {
 
     // Verify frontmatter was extracted
     assert!(!result.metadata.is_null());
-    assert_eq!(result.metadata.get("title").and_then(|v| v.as_str()), Some("Test Page"));
+    assert_eq!(
+        result.metadata.get("title").and_then(|v| v.as_str()),
+        Some("Test Page")
+    );
 
     // Verify HTML output contains the title
-    let html = result.output.as_ref().expect("HTML output should be present");
+    let html = result
+        .output
+        .as_ref()
+        .expect("HTML output should be present");
     assert!(html.contains("Test Page"));
 }
 
@@ -149,7 +153,10 @@ fn test_html_output_minified() {
         .as_ref()
         .expect("Result should be present");
 
-    let html = result.output.as_ref().expect("HTML output should be present");
+    let html = result
+        .output
+        .as_ref()
+        .expect("HTML output should be present");
     // Minified HTML should have reduced whitespace
     assert!(html.len() > 0);
 }
@@ -186,7 +193,10 @@ fn test_html_output_with_jsx() {
         .as_ref()
         .expect("Result should be present");
 
-    let html = result.output.as_ref().expect("HTML output should be present");
+    let html = result
+        .output
+        .as_ref()
+        .expect("HTML output should be present");
     assert!(html.contains("JSX content"));
 }
 
@@ -236,10 +246,8 @@ fn test_javascript_output_with_frontmatter() {
     let service = create_test_service();
 
     let mut mdx_files = HashMap::new();
-    let mdx_content = create_mdx_with_frontmatter(
-        "JS Test",
-        "# {context('title')}\n\nContent here.",
-    );
+    let mdx_content =
+        create_mdx_with_frontmatter("JS Test", "# {context('title')}\n\nContent here.");
     mdx_files.insert("js_with_frontmatter.mdx".to_string(), mdx_content);
 
     let input = NamedMdxBatchInput {
@@ -269,7 +277,10 @@ fn test_javascript_output_with_frontmatter() {
 
     // Verify frontmatter was extracted
     assert!(!result.metadata.is_null());
-    assert_eq!(result.metadata.get("title").and_then(|v| v.as_str()), Some("JS Test"));
+    assert_eq!(
+        result.metadata.get("title").and_then(|v| v.as_str()),
+        Some("JS Test")
+    );
 
     // Verify JavaScript output is present
     let js = result.output.as_ref().expect("JS output should be present");
@@ -320,8 +331,8 @@ fn test_schema_output_format() {
     println!("Schema output:\n{}", schema);
 
     // Parse as JSON array
-    let components: Vec<String> = serde_json::from_str(schema)
-        .expect("Schema should be a valid JSON array");
+    let components: Vec<String> =
+        serde_json::from_str(schema).expect("Schema should be a valid JSON array");
 
     // Should contain Button and Card (unique, sorted)
     assert_eq!(components, vec!["Button", "Card"]);
@@ -379,11 +390,14 @@ fn test_schema_output_with_complex_jsx() {
     println!("Complex schema output:\n{}", schema);
 
     // Parse as JSON array
-    let components: Vec<String> = serde_json::from_str(schema)
-        .expect("Schema should be a valid JSON array");
+    let components: Vec<String> =
+        serde_json::from_str(schema).expect("Schema should be a valid JSON array");
 
     // Should contain all unique component names, sorted
-    assert_eq!(components, vec!["Container", "Footer", "Header", "List", "ListItem"]);
+    assert_eq!(
+        components,
+        vec!["Container", "Footer", "Header", "List", "ListItem"]
+    );
 }
 
 #[test]
@@ -435,8 +449,8 @@ fn test_schema_output_with_frontmatter() {
     println!("Schema with frontmatter output:\n{}", schema);
 
     // Parse as JSON array
-    let components: Vec<String> = serde_json::from_str(schema)
-        .expect("Schema should be a valid JSON array");
+    let components: Vec<String> =
+        serde_json::from_str(schema).expect("Schema should be a valid JSON array");
 
     // Should contain Alert and Card (sorted)
     assert_eq!(components, vec!["Alert", "Card"]);

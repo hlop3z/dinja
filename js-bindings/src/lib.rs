@@ -141,13 +141,8 @@ impl Renderer {
     #[napi]
     pub fn render(&self, input: String) -> Result<String> {
         // Parse JSON string to Rust struct
-        let batch_input: dinja_core::models::NamedMdxBatchInput =
-            serde_json::from_str(&input).map_err(|e| {
-                Error::new(
-                    Status::InvalidArg,
-                    format!("Failed to parse input: {}", e),
-                )
-            })?;
+        let batch_input: dinja_core::models::NamedMdxBatchInput = serde_json::from_str(&input)
+            .map_err(|e| Error::new(Status::InvalidArg, format!("Failed to parse input: {}", e)))?;
 
         // Call render_batch on the locked service
         let outcome = {

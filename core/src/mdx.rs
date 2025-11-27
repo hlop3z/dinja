@@ -228,8 +228,9 @@ fn extract_component_names(content: &str) -> Result<String, MdxError> {
     sorted_names.sort();
 
     // Return as JSON array
-    serde_json::to_string(&sorted_names)
-        .map_err(|e| MdxError::FrontmatterParse(format!("Failed to serialize component names: {e}")))
+    serde_json::to_string(&sorted_names).map_err(|e| {
+        MdxError::FrontmatterParse(format!("Failed to serialize component names: {e}"))
+    })
 }
 
 fn render_with_engine_pipeline(
@@ -270,11 +271,17 @@ fn render_with_engine_pipeline(
                 .map_err(|e| {
                     MdxError::TsxTransform(format!("Failed to transform TSX to JavaScript: {e}"))
                 })?;
-            eprintln!("[DEBUG] TSX: {}", javascript_output.chars().take(150).collect::<String>());
+            eprintln!(
+                "[DEBUG] TSX: {}",
+                javascript_output.chars().take(150).collect::<String>()
+            );
 
             // HOT PATH: Component rendering - executes JavaScript and renders to HTML
             let template_output = render_template(context, &javascript_output)?;
-            eprintln!("[DEBUG] Result: {}", template_output.chars().take(150).collect::<String>());
+            eprintln!(
+                "[DEBUG] Result: {}",
+                template_output.chars().take(150).collect::<String>()
+            );
 
             match context.settings.output {
                 OutputFormat::Html => {
@@ -282,9 +289,12 @@ fn render_with_engine_pipeline(
                     Ok(unwrap_fragment(&template_output))
                 }
                 OutputFormat::Javascript => {
-                    transform_tsx_to_js_for_output(&template_output, context.settings.minify).map_err(|e| {
-                        MdxError::TsxTransform(format!("Failed to transform template to JavaScript: {e}"))
-                    })
+                    transform_tsx_to_js_for_output(&template_output, context.settings.minify)
+                        .map_err(|e| {
+                            MdxError::TsxTransform(format!(
+                                "Failed to transform template to JavaScript: {e}"
+                            ))
+                        })
                 }
                 OutputFormat::Json => {
                     // Render using core.js engine for json output

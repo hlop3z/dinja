@@ -59,8 +59,7 @@
 //! ```
 use crate::mdx::{create_error_response, mdx_to_html_with_frontmatter};
 use crate::models::{
-    ComponentDefinition, NamedMdxBatchInput, OutputFormat, RenderedMdx,
-    ResourceLimits,
+    ComponentDefinition, NamedMdxBatchInput, OutputFormat, RenderedMdx, ResourceLimits,
 };
 use crate::renderer::pool::{RendererPool, RendererProfile};
 use anyhow::Error as AnyhowError;
@@ -444,12 +443,12 @@ impl RenderService {
         format: &OutputFormat,
     ) -> Result<RendererProfile, RenderBatchError> {
         match format {
-            OutputFormat::Html | OutputFormat::Javascript | OutputFormat::Schema | OutputFormat::Json => {
-                Ok(RendererProfile::Engine)
-            }
+            OutputFormat::Html
+            | OutputFormat::Javascript
+            | OutputFormat::Schema
+            | OutputFormat::Json => Ok(RendererProfile::Engine),
         }
     }
-
 }
 
 /// Errors surfaced by the batch renderer.

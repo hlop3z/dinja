@@ -118,8 +118,8 @@ impl JsRenderer {
             // Set up the context variable globally before executing component code
             setup_context(runtime, props_json).map_err(anyhow::Error::from)?;
 
-            let render_script =
-                component_render_script(component_code, props_json, utils_code).map_err(anyhow::Error::from)?;
+            let render_script = component_render_script(component_code, props_json, utils_code)
+                .map_err(anyhow::Error::from)?;
 
             // Evaluate and get the result
             let result = runtime
@@ -170,7 +170,8 @@ impl JsRenderer {
             })
             .unwrap_or_default();
 
-        let wrapped_code = wrap_transformed_component(&component_bootstrap, transformed_js, &component_names);
+        let wrapped_code =
+            wrap_transformed_component(&component_bootstrap, transformed_js, &component_names);
 
         self.render_component(&wrapped_code, props, utils_code)
     }
@@ -195,8 +196,8 @@ impl JsRenderer {
             // Set up the context variable globally before executing component code
             setup_context(runtime, props_json).map_err(anyhow::Error::from)?;
 
-            let render_script =
-                schema_render_script(component_code, props_json, utils_code).map_err(anyhow::Error::from)?;
+            let render_script = schema_render_script(component_code, props_json, utils_code)
+                .map_err(anyhow::Error::from)?;
 
             // Evaluate and get the result
             let result = runtime
@@ -247,7 +248,8 @@ impl JsRenderer {
             })
             .unwrap_or_default();
 
-        let wrapped_code = wrap_transformed_component(&component_bootstrap, transformed_js, &component_names);
+        let wrapped_code =
+            wrap_transformed_component(&component_bootstrap, transformed_js, &component_names);
 
         self.render_component_to_schema(&wrapped_code, props, utils_code)
     }
