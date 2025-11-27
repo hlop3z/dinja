@@ -4,7 +4,7 @@ This document explains how to cut a release of dinja across crates.io and PyPI
 using the Cyclopts-based `release.py` helper plus GitHub Actions.
 
 ```sh
-uv run release.py bump --version 0.x.x
+uv run release.py release --version 0.x.x
 ```
 
 ## Prerequisites
