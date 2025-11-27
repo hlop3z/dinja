@@ -256,13 +256,55 @@ Renders MDX content.
 ## Requirements
 
 - Node.js >= 18
+- **Server-side only** - This package uses native Node.js addons and cannot be bundled for browser use
+
+## Important: Server-Side Only
+
+This package contains native `.node` binaries and is designed for **server-side Node.js environments only**. It cannot be used in:
+
+- Browser bundles (Webpack, Vite, esbuild, Rollup, etc.)
+- Edge runtimes (Cloudflare Workers, Vercel Edge)
+- Browser-based environments
+
+### Using with Vite/Next.js
+
+If you're using Vite or Next.js, ensure the package is only imported in server-side code:
+
+```javascript
+// ✅ Correct: Server-side only (API routes, SSR, etc.)
+// pages/api/render.js or app/api/render/route.js
+import { Renderer } from '@dinja/core';
+
+export async function POST(request) {
+  const renderer = new Renderer();
+  // ... render MDX server-side
+}
+
+// ❌ Wrong: Client-side code (will fail to bundle)
+// components/MyComponent.jsx
+import { Renderer } from '@dinja/core'; // Error: No loader for .node files
+```
+
+For Vite projects, you may need to exclude it from optimization:
+
+```javascript
+// vite.config.js
+export default {
+  optimizeDeps: {
+    exclude: ['@dinja/core']
+  },
+  ssr: {
+    noExternal: ['@dinja/core']
+  }
+}
+```
 
 ## Platform Support
 
 Pre-built binaries are provided for:
-- Windows (x64, ARM64)
+- Windows (x64)
 - macOS (x64, ARM64)
-- Linux (x64, ARM64, musl)
+- Linux (x64 glibc)
 
 ## License
 
