@@ -3,7 +3,7 @@ members = ["core", "python-bindings", "js-bindings"]
 resolver = "2"
 
 [workspace.package]
-version = "0.2.2"
+version = "0.3.0"
 edition = "2021"
 authors = ["dinja contributors"]
 license = "BSD-3-Clause"
