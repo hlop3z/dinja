@@ -13,7 +13,7 @@ def main():
     # Create a renderer instance (engine loads once)
     renderer = Renderer()
     
-    # Example 1: Simple MDX rendering with base engine
+    # Example 1: Simple MDX rendering
     print("Example 1: Simple MDX rendering")
     print("=" * 50)
 
@@ -21,14 +21,11 @@ def main():
         "settings": {
             "output": "html",
             "minify": True,
-            "engine": "base",
-            "components": [],
         },
         "mdx": {
             "page1.mdx": "# Hello World\n\nThis is a simple MDX file.",
             "page2.mdx": "## Introduction\n\nThis is another page with **bold** text.",
         },
-        "components": None,
     }
 
     try:
@@ -76,8 +73,6 @@ def main():
         "settings": {
             "output": "html",
             "minify": True,
-            "engine": "custom",
-            "components": [],
         },
         "mdx": {
             "custom-page.mdx": "# Custom Component\n\n<MyComponent prop1='value' />",
@@ -85,9 +80,7 @@ def main():
         "components": {
             "MyComponent": {
                 "name": "MyComponent",
-                "code": "function Component(props) { return <div>Custom: {props.prop1}</div>; }",
-                "docs": "A custom component example",
-                "args": None,
+                "code": "export default function Component(props) { return <div>Custom: {props.prop1}</div>; }",
             },
         },
     }
@@ -118,13 +111,10 @@ def main():
             "settings": {
                 "output": output_format,
                 "minify": False,
-                "engine": "base",
-                "components": [],
             },
             "mdx": {
                 f"example-{output_format}.mdx": "# Example\n\nThis is an example.",
             },
-            "components": None,
         }
 
         try:

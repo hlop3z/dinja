@@ -208,18 +208,20 @@ fn convert_component_refs_in_ast(code: &str, component_names: &HashSet<&str>) ->
     result
 }
 
-/// Cleans up the generated code by removing pure annotations and ES module imports
+/// Cleans up the generated code by removing pure annotations, ES module imports, and export statements
 fn cleanup_generated_code(code: &str) -> String {
     let mut cleaned = code.to_string();
     // Replace pure annotations with a space
     cleaned = cleaned.replace("/* @__PURE__ */ ", " ");
-    // Remove ES module import statements (they're not valid in script context)
-    // Pattern: import ... from "...";
+    // Remove ES module constructs (import/export) that aren't valid in script context
     let lines: Vec<&str> = cleaned
         .lines()
         .filter(|line| {
             let trimmed = line.trim();
+            // Filter out import and export statements
             !trimmed.starts_with("import ")
+                && !trimmed.starts_with("export default ")
+                && !trimmed.starts_with("export ")
         })
         .collect();
     cleaned = lines.join("\n");
@@ -276,10 +278,13 @@ fn transform_tsx_internal(
 ) -> Result<String, MdxError> {
     let allocator = Allocator::default();
 
-    // Determine source type from file path
+    // Determine source type from file path and configure for module mode with decorators
     const COMPONENT_PATH: &str = "component.tsx";
-    let source_type = SourceType::from_path(Path::new(COMPONENT_PATH))
+    let mut source_type = SourceType::from_path(Path::new(COMPONENT_PATH))
         .map_err(|e| MdxError::SourceType(e.to_string()))?;
+
+    // Enable module mode to better handle export statements and enable decorators
+    source_type = source_type.with_module(true);
 
     let path = Path::new(COMPONENT_PATH);
 
@@ -344,6 +349,26 @@ pub fn transform_component_function(component_code: &str) -> Result<String, MdxE
     transform_tsx_internal(component_code, &TsxTransformConfig::default(), false)
 }
 
+/// Strips export statements from component code
+///
+/// Removes `export default` and `export` from the beginning of component code
+/// to make it compatible with the TSX parser
+fn strip_export_statements(code: &str) -> String {
+    let trimmed = code.trim();
+
+    // Handle "export default function" or "export default ..."
+    if let Some(rest) = trimmed.strip_prefix("export default ") {
+        return rest.to_string();
+    }
+
+    // Handle "export function" or "export const/let/var"
+    if let Some(rest) = trimmed.strip_prefix("export ") {
+        return rest.to_string();
+    }
+
+    code.to_string()
+}
+
 /// Intelligently transforms component code (detects if it's raw JSX or a function)
 ///
 /// # Arguments
@@ -352,7 +377,9 @@ pub fn transform_component_function(component_code: &str) -> Result<String, MdxE
 /// # Returns
 /// Generated JavaScript code or an error
 pub fn transform_component_code(code: &str) -> Result<String, MdxError> {
-    let trimmed = code.trim();
+    // First, strip any export statements
+    let code_without_exports = strip_export_statements(code);
+    let trimmed = code_without_exports.trim();
 
     // Check if it's already a function definition
     let is_function = trimmed.starts_with("function")
@@ -363,9 +390,9 @@ pub fn transform_component_code(code: &str) -> Result<String, MdxError> {
 
     if is_function {
         // It's a function, transform without wrapping
-        transform_component_function(code)
+        transform_component_function(&code_without_exports)
     } else {
         // It's raw JSX, use the normal transformer that wraps it
-        transform_tsx_to_js(code)
+        transform_tsx_to_js(&code_without_exports)
     }
 }

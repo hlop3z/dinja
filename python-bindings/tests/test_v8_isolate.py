@@ -46,8 +46,6 @@ def _build_render_config(mode: str, mdx: dict[str, str]) -> dict[str, Any]:
         "settings": {
             "output": mode,
             "minify": True,
-            "engine": "base",
-            "components": ["Button"],
         },
         "mdx": mdx,
         "components": _COMPONENTS,

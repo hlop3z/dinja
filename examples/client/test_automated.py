@@ -223,21 +223,15 @@ def main() -> None:
         components = {
             "Button": {
                 "name": "Button",
-                "code": "function Component(props) { return <button class={props.class || 'btn'}>{props.children}</button>; }",
-                "docs": "A button component",
-                "args": None,
+                "code": "export default function Component(props) { return <button class={props.class || 'btn'}>{props.children}</button>; }",
             },
             "Card": {
                 "name": "Card",
-                "code": "function Component(props) { return <div class='card'><h3>{props.title}</h3><div class='card-content'>{props.children}</div></div>; }",
-                "docs": "A card component",
-                "args": None,
+                "code": "export default function Component(props) { return <div class='card'><h3>{props.title}</h3><div class='card-content'>{props.children}</div></div>; }",
             },
             "Greeting": {
                 "name": "Greeting",
-                "code": "function Component(props) { return <div>Hello, <strong>{props.name}</strong>!</div>; }",
-                "docs": "A greeting component",
-                "args": None,
+                "code": "export default function Component(props) { return <div>Hello, <strong>{props.name}</strong>!</div>; }",
             },
         }
         

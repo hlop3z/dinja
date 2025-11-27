@@ -27,7 +27,7 @@ def main() -> None:
     print("Example 1: Rendering with HTML output")
     print("-" * 50)
     payload_html = {
-        "settings": {"output": "html", "minify": True, "engine": "base"},
+        "settings": {"output": "html", "minify": True},
         "mdx": {"example.mdx": "---\ntitle: Demo\n---\n# Hello **dinja**"},
     }
 
@@ -48,7 +48,7 @@ def main() -> None:
     print("Example 2: Rendering with schema output (same instance)")
     print("-" * 50)
     payload_schema = {
-        "settings": {"output": "schema", "minify": True, "engine": "base"},
+        "settings": {"output": "schema", "minify": True},
         "mdx": {"example.mdx": "---\ntitle: Demo\n---\n# Hello **dinja**"},
     }
 
@@ -78,7 +78,6 @@ def main() -> None:
             "settings": {
                 "output": output_format,
                 "minify": False,
-                "engine": "base",
             },
             "mdx": {
                 f"example-{output_format}.mdx": f"# Example {output_format.upper()}\n\nThis is an example.",

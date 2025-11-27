@@ -16,9 +16,7 @@ from dinja import Renderer
 PAYLOAD: Dict[str, Any] = {
     "settings": {
         "output": "schema",  # "html", "javascript", or "schema"
-        "engine": "base",  # "base" or "custom"
         "minify": True,
-        "components": ["Hero", "Feature"],
     },
     "mdx": {
         "home": "---\ntitle: Home\n---\n# Welcome\nThis is the **home page**",
@@ -31,9 +29,17 @@ PAYLOAD: Dict[str, Any] = {
             "<Hero title={context('title')} description={context('description')} />"
         ),
     },
-    # Provide custom component definitions when using the "custom" engine.
-    # Not required for this base-engine example.
-    "components": None,
+    # Provide custom component definitions if needed
+    "components": {
+        "Hero": {
+            "name": "Hero",
+            "code": "export default function Component(props) { return <div class='hero'><h1>{props.title}</h1><p>{props.description}</p></div>; }",
+        },
+        "Feature": {
+            "name": "Feature",
+            "code": "export default function Component(props) { return <div class='feature'>{props.children}</div>; }",
+        },
+    },
 }
 
 
