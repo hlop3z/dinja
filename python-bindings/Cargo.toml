@@ -6,7 +6,7 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 description.workspace = true
-readme.workspace = true
+readme = "README.md"  # Use local README.md instead of workspace one to avoid conflict
 documentation.workspace = true
 
 [lib]
