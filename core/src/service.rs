@@ -48,6 +48,7 @@
 //!         output: OutputFormat::Html,
 //!         minify: true,
 //!         utils: None,
+//!         directives: None,
 //!     },
 //!     mdx: mdx_files,
 //!     components: None,

@@ -117,11 +117,15 @@ class Settings:
         utils: Optional JavaScript snippet to inject as global utilities.
             Must use `export default { ... }` syntax.
             Example: "export default { greeting: 'Hello', emoji: '👋' }"
+        directives: Optional map of directive names to their string values.
+            Can be used for custom processing or metadata.
+            Example: {"lang": "en", "theme": "dark"}
     """
 
     output: OutputFormat = "html"
     minify: bool = True
     utils: str | None = None
+    directives: dict[str, str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -131,6 +135,8 @@ class Settings:
         }
         if self.utils is not None:
             result["utils"] = self.utils
+        if self.directives is not None:
+            result["directives"] = self.directives
         return result
 
 

@@ -436,3 +436,43 @@ tags:
     assert metadata["published"] is True
     assert "python" in metadata["tags"]
     assert "rust" in metadata["tags"]
+
+
+def test_dataclass_settings_with_directives() -> None:
+    """Test Settings with directives parameter."""
+    renderer = Renderer()
+
+    result = renderer.render(
+        Input(
+            settings=Settings(
+                output="html",
+                minify=False,
+                directives={"lang": "en", "theme": "dark"},
+            ),
+            mdx={"page.mdx": "# Hello"},
+        )
+    )
+
+    assert result["succeeded"] == 1
+    file_result = result["files"]["page.mdx"]
+    assert file_result["status"] == "success"
+
+
+def test_dataclass_settings_directives_to_dict() -> None:
+    """Test that directives are included in Settings.to_dict()."""
+    settings = Settings(
+        output="html",
+        directives={"key1": "value1", "key2": "value2"},
+    )
+    result = settings.to_dict()
+
+    assert result["output"] == "html"
+    assert result["directives"] == {"key1": "value1", "key2": "value2"}
+
+
+def test_dataclass_settings_directives_none_not_in_dict() -> None:
+    """Test that directives is not included in to_dict when None."""
+    settings = Settings(output="html")
+    result = settings.to_dict()
+
+    assert "directives" not in result

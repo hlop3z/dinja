@@ -13,6 +13,8 @@ export interface RenderSettings {
   minify: boolean;
   /** Optional JavaScript snippet to inject as global utilities (must use `export default { ... }`) */
   utils?: string;
+  /** Optional map of directive names to their string values for custom processing */
+  directives?: Record<string, string>;
 }
 
 /**
