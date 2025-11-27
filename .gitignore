@@ -179,3 +179,4 @@ cython_debug/
 **/*.rs.bk
 Cargo.lock          # ignore only if this is a library
 *.pyd               # Windows Python extension built via Rust
+.claude/settings.local.json
