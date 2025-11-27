@@ -1,87 +1,145 @@
-"""Example usage of the dinja Python bindings with utils.
+"""Example usage of the dinja Python bindings with the dataclass API.
 
-This example demonstrates how to use the `utils` setting to inject
-global JavaScript utilities via `export default { ... }`.
+This example demonstrates how to use the type-safe dataclass API with
+Settings, Input, and ComponentDefinition classes.
 """
 
 from __future__ import annotations
 
 from pprint import pprint
-from typing import Any, Dict
 
-from dinja import Renderer
-
-# The payload matches the Input structure from the Rust core.
-PAYLOAD: Dict[str, Any] = {
-    "settings": {
-        "output": "html",  # "html", "javascript", "schema", or "json"
-        "minify": True,
-        # Utils must use `export default` to return a single object
-        "utils": """export default {
-            formatDate: (date) => new Date(date).toLocaleDateString(),
-            uppercase: (str) => str.toUpperCase(),
-            siteName: "My Awesome Site"
-        }""",
-    },
-    "mdx": {
-        "home": """---
-title: Home
----
-# Welcome
-This is the **{utils.siteName} | Home Page**""",
-        "about": """---
-title: About
-author: Alice
----
-## About Us
-Some details {2+3} equals five""",
-        "contact": """---
-title: Contact
-description: Contact us
----
-<Hero title="Contact" description="Contact us" />""",
-    },
-    # Provide custom component definitions if needed
-    "components": {
-        "Hero": {
-            "name": "Hero",
-            "code": """export default function Component(props) {
-    return <div class="hero"><h1>{props.title}</h1><p>{props.description}</p></div>;
-}""",
-        },
-        "Feature": {
-            "name": "Feature",
-            "code": """export default function Component(props) {
-    return <div class="feature">{props.children}</div>;
-}""",
-        },
-    },
-}
+from dinja import ComponentDefinition, Input, Renderer, Settings
 
 
 def main() -> None:
+    """Main example function demonstrating the dataclass API."""
+    print("Dinja Python Bindings - Dataclass API Example")
+    print("=" * 60)
+    print()
+
+    # Create a renderer instance
     renderer = Renderer()
-    outcome = renderer.render(PAYLOAD)
-    print(f"Processed {outcome['total']} file(s)")
-    print(f"Succeeded: {outcome['succeeded']}  Failed: {outcome['failed']}")
 
-    for filename, entry in outcome["files"].items():
-        status = entry["status"]
-        print(f"\n{filename}: {status}")
+    # Example 1: Simple MDX rendering with Settings
+    print("Example 1: Simple MDX rendering")
+    print("-" * 60)
 
-        if status == "success":
-            rendered = entry.get("result") or {}
-            metadata = rendered.get("metadata")
-            if metadata:
-                print("metadata:")
-                pprint(metadata)
+    result = renderer.render(
+        Input(
+            settings=Settings(output="html", minify=False),
+            mdx={"hello.mdx": "# Hello **dinja**\n\nThis is rendered from Python!"},
+        )
+    )
 
-            output = rendered.get("output") or ""
-            if output:
-                preview = output[:160] + ("…" if len(output) > 160 else "")
-                print(f"output preview: {preview}")
-        else:
-            print(f"error: {entry.get('error', 'unknown error')}")
+    print(f"Status: {result['succeeded']}/{result['total']} succeeded")
+    file_result = result["files"]["hello.mdx"]
+    if file_result["status"] == "success":
+        print(f"Output: {file_result['result']['output']}")
+    print()
+
+    # Example 2: Using utils for global JavaScript utilities
+    print("Example 2: Global utils")
+    print("-" * 60)
+
+    result = renderer.render(
+        Input(
+            settings=Settings(
+                output="html",
+                minify=False,
+                utils="export default { siteName: 'My Site', version: '1.0.0' }",
+            ),
+            mdx={"page.mdx": "<SiteInfo />"},
+            components={
+                "SiteInfo": ComponentDefinition(
+                    code="""export default function Component() {
+    return <p>Welcome to {utils.siteName} v{utils.version}</p>;
+}"""
+                )
+            },
+        )
+    )
+
+    file_result = result["files"]["page.mdx"]
+    if file_result["status"] == "success":
+        print(f"Output: {file_result['result']['output']}")
+    print()
+
+    # Example 3: Custom components with simple dict syntax
+    print("Example 3: Custom components (simple dict syntax)")
+    print("-" * 60)
+
+    # You can use a simple dict of name -> code strings
+    result = renderer.render(
+        Input(
+            settings=Settings(output="html"),
+            mdx={"buttons.mdx": "<Button>Click me</Button>\n<Button>Submit</Button>"},
+            # Simple dict syntax - automatically converted to ComponentDefinition
+            components={
+                "Button": """export default function Component({ children }) {
+    return <button class="btn">{children}</button>;
+}"""
+            },
+        )
+    )
+
+    file_result = result["files"]["buttons.mdx"]
+    if file_result["status"] == "success":
+        print(f"Output: {file_result['result']['output']}")
+    print()
+
+    # Example 4: YAML frontmatter extraction
+    print("Example 4: YAML frontmatter")
+    print("-" * 60)
+
+    result = renderer.render(
+        Input(
+            settings=Settings(output="html"),
+            mdx={
+                "blog.mdx": """---
+title: My Blog Post
+author: Alice
+date: 2024-01-15
+tags:
+  - python
+  - rust
+  - mdx
+---
+
+# {frontmatter.title}
+
+Written by **{frontmatter.author}**
+"""
+            },
+        )
+    )
+
+    file_result = result["files"]["blog.mdx"]
+    if file_result["status"] == "success":
+        print("Metadata:")
+        pprint(file_result["result"]["metadata"])
+        print(f"\nOutput preview: {file_result['result']['output'][:100]}...")
+    print()
+
+    # Example 5: Multiple output formats
+    print("Example 5: Different output formats")
+    print("-" * 60)
+
+    for output_format in ["html", "javascript", "schema"]:
+        result = renderer.render(
+            Input(
+                settings=Settings(output=output_format, minify=False),  # type: ignore
+                mdx={"test.mdx": "# Hello\n\nWorld"},
+            )
+        )
+        file_result = result["files"]["test.mdx"]
+        if file_result["status"] == "success":
+            output = file_result["result"]["output"]
+            preview = output[:60] + "..." if len(output) > 60 else output
+            print(f"{output_format.upper():12} {preview}")
+
+    print()
+    print("=" * 60)
+    print("All examples completed successfully!")
 
 
 if __name__ == "__main__":
