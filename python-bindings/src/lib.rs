@@ -183,7 +183,7 @@ mod tests {
         // Create directory if it doesn't exist
         fs::create_dir_all(&static_dir).expect("Failed to create test static directory");
 
-        // Write embedded files
+        // Write embedded files - ensure they're written atomically to avoid race conditions
         fs::write(static_dir.join("engine.min.js"), ENGINE_MIN_JS)
             .expect("Failed to write engine.min.js");
         fs::write(
@@ -192,6 +192,17 @@ mod tests {
         )
         .expect("Failed to write engine_to_string.min.js");
         fs::write(static_dir.join("core.js"), CORE_JS).expect("Failed to write core.js");
+
+        // Verify files were written correctly
+        assert!(
+            static_dir.join("engine.min.js").exists(),
+            "engine.min.js was not created"
+        );
+        assert!(
+            static_dir.join("engine_to_string.min.js").exists(),
+            "engine_to_string.min.js was not created"
+        );
+        assert!(static_dir.join("core.js").exists(), "core.js was not created");
 
         static_dir
     }
@@ -223,6 +234,7 @@ mod tests {
             resource_limits: dinja_core::models::ResourceLimits::default(),
         };
         // Don't skip pool warming - let it warm up normally, but handle errors gracefully
+        // If pool warming fails, the first render will create a new renderer anyway
         CoreRenderService::new(config).expect("Failed to create service")
     }
 
