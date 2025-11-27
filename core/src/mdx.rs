@@ -25,8 +25,9 @@ use crate::renderer::JsRenderer;
 use crate::transform::{transform_tsx_to_js_for_output, transform_tsx_to_js_with_config};
 use gray_matter::{engine::YAML, Matter};
 use markdown::{to_html_with_options, CompileOptions, Constructs, Options, ParseOptions};
+use regex::Regex;
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 struct RenderContext<'a> {
     renderer: &'a JsRenderer,
@@ -197,6 +198,40 @@ pub fn create_error_response(error: &anyhow::Error) -> RenderedMdx {
     }
 }
 
+/// Extracts unique component names from HTML/MDX content.
+///
+/// Finds all JSX-style elements that start with a capital letter (custom components)
+/// and returns them as a unique sorted list.
+///
+/// # Arguments
+/// * `content` - The HTML/MDX content to scan for component names
+///
+/// # Returns
+/// A JSON array of unique component names as a string
+fn extract_component_names(content: &str) -> Result<String, MdxError> {
+    // Regex to match JSX opening tags that start with capital letters
+    // Matches: <ComponentName, <ComponentName>, <ComponentName attr="value">
+    // Does not match: <div>, <span>, etc. (lowercase HTML tags)
+    let re = Regex::new(r"<([A-Z][a-zA-Z0-9]*)")
+        .map_err(|e| MdxError::MarkdownRender(format!("Regex compilation failed: {e}")))?;
+
+    let mut component_names: HashSet<String> = HashSet::new();
+
+    for cap in re.captures_iter(content) {
+        if let Some(name) = cap.get(1) {
+            component_names.insert(name.as_str().to_string());
+        }
+    }
+
+    // Convert to sorted vector for consistent output
+    let mut sorted_names: Vec<String> = component_names.into_iter().collect();
+    sorted_names.sort();
+
+    // Return as JSON array
+    serde_json::to_string(&sorted_names)
+        .map_err(|e| MdxError::FrontmatterParse(format!("Failed to serialize component names: {e}")))
+}
+
 fn render_with_engine_pipeline(
     context: &RenderContext<'_>,
     html_output: &str,
@@ -204,50 +239,59 @@ fn render_with_engine_pipeline(
     // HOT PATH: TSX transformation - called for every MDX file with Html/Javascript output
     let mut transform_config = TsxTransformConfig::for_engine(false);
 
-    // For schema/json output, convert component function references to strings
-    // For HTML output, keep as function references so they can be rendered
-    // For JavaScript output, keep Preact syntax with h() and Fragment
-    if matches!(context.settings.output, OutputFormat::Schema | OutputFormat::Json) {
-        if let Some(components) = context.components {
-            let component_names: std::collections::HashSet<String> = components
-                .iter()
-                .map(|(key, comp_def)| {
-                    comp_def
-                        .name
-                        .as_ref()
-                        .cloned()
-                        .unwrap_or_else(|| key.clone())
-                })
-                .collect();
-            if !component_names.is_empty() {
-                transform_config.component_names = Some(component_names);
-            }
-        }
-    }
-
-    let javascript_output = transform_tsx_to_js_with_config(html_output, transform_config)
-        .map_err(|e| {
-            MdxError::TsxTransform(format!("Failed to transform TSX to JavaScript: {e}"))
-        })?;
-    eprintln!("[DEBUG] TSX: {}", javascript_output.chars().take(150).collect::<String>());
-
-    // HOT PATH: Component rendering - executes JavaScript and renders to HTML
-    let template_output = render_template(context, &javascript_output)?;
-    eprintln!("[DEBUG] Result: {}", template_output.chars().take(150).collect::<String>());
-
     match context.settings.output {
-        OutputFormat::Html => {
-            // Unwrap Fragment wrapper if present - only return children of first Fragment
-            Ok(unwrap_fragment(&template_output))
+        OutputFormat::Schema => {
+            // For schema output, extract unique component names from the markdown
+            extract_component_names(html_output)
         }
-        OutputFormat::Javascript => {
-            transform_tsx_to_js_for_output(&template_output, context.settings.minify).map_err(|e| {
-                MdxError::TsxTransform(format!("Failed to transform template to JavaScript: {e}"))
-            })
-        }
-        OutputFormat::Schema | OutputFormat::Json => {
-            // Render using core.js engine for schema/json output
-            render_template_to_schema(context, &javascript_output)
+        OutputFormat::Html | OutputFormat::Javascript | OutputFormat::Json => {
+            // For json output, convert component function references to strings
+            // For HTML output, keep as function references so they can be rendered
+            // For JavaScript output, keep Preact syntax with h() and Fragment
+            if matches!(context.settings.output, OutputFormat::Json) {
+                if let Some(components) = context.components {
+                    let component_names: std::collections::HashSet<String> = components
+                        .iter()
+                        .map(|(key, comp_def)| {
+                            comp_def
+                                .name
+                                .as_ref()
+                                .cloned()
+                                .unwrap_or_else(|| key.clone())
+                        })
+                        .collect();
+                    if !component_names.is_empty() {
+                        transform_config.component_names = Some(component_names);
+                    }
+                }
+            }
+
+            let javascript_output = transform_tsx_to_js_with_config(html_output, transform_config)
+                .map_err(|e| {
+                    MdxError::TsxTransform(format!("Failed to transform TSX to JavaScript: {e}"))
+                })?;
+            eprintln!("[DEBUG] TSX: {}", javascript_output.chars().take(150).collect::<String>());
+
+            // HOT PATH: Component rendering - executes JavaScript and renders to HTML
+            let template_output = render_template(context, &javascript_output)?;
+            eprintln!("[DEBUG] Result: {}", template_output.chars().take(150).collect::<String>());
+
+            match context.settings.output {
+                OutputFormat::Html => {
+                    // Unwrap Fragment wrapper if present - only return children of first Fragment
+                    Ok(unwrap_fragment(&template_output))
+                }
+                OutputFormat::Javascript => {
+                    transform_tsx_to_js_for_output(&template_output, context.settings.minify).map_err(|e| {
+                        MdxError::TsxTransform(format!("Failed to transform template to JavaScript: {e}"))
+                    })
+                }
+                OutputFormat::Json => {
+                    // Render using core.js engine for json output
+                    render_template_to_schema(context, &javascript_output)
+                }
+                OutputFormat::Schema => unreachable!("Schema handled in outer match"),
+            }
         }
     }
 }

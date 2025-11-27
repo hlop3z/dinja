@@ -5,8 +5,14 @@
 
 set -e
 
+# Get the directory where this script is located (utils/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+
+# Get the project root directory (parent of utils/)
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Change to project root for all operations
+cd "$PROJECT_ROOT"
 
 # Colors for output
 GREEN='\033[0;32m'

@@ -278,7 +278,7 @@ fn test_schema_output_format() {
     let mut mdx_files = HashMap::new();
     mdx_files.insert(
         "schema_output.mdx".to_string(),
-        "# Schema Output\n\nTest content with **markdown**.".to_string(),
+        "# Schema Output\n\n<Button>Click</Button>\n\n<Card title=\"Test\">Content</Card>\n\n<Button>Another</Button>".to_string(),
     );
 
     let input = NamedMdxBatchInput {
@@ -305,13 +305,19 @@ fn test_schema_output_format() {
         .as_ref()
         .expect("Result should be present");
 
-    // Verify schema (transformed JS code) is present
+    // Verify schema (component names list) is present
     assert!(result.output.is_some());
     let schema = result.output.as_ref().unwrap();
 
-    // Schema output should contain the transformed JavaScript code
-    assert!(schema.len() > 0);
+    // Schema output should be a JSON array of component names
     println!("Schema output:\n{}", schema);
+
+    // Parse as JSON array
+    let components: Vec<String> = serde_json::from_str(schema)
+        .expect("Schema should be a valid JSON array");
+
+    // Should contain Button and Card (unique, sorted)
+    assert_eq!(components, vec!["Button", "Card"]);
 }
 
 #[test]
@@ -323,15 +329,15 @@ fn test_schema_output_with_complex_jsx() {
         "schema_complex.mdx".to_string(),
         r#"# Complex JSX
 
-<div className="container">
-  <h2>Nested Elements</h2>
-  <ul>
-    <li>Item 1</li>
-    <li>Item 2</li>
-  </ul>
-</div>
+<Container>
+  <Header>Title</Header>
+  <List>
+    <ListItem>Item 1</ListItem>
+    <ListItem>Item 2</ListItem>
+  </List>
+</Container>
 
-Some **markdown** content.
+<Footer>End</Footer>
 "#
         .to_string(),
     );
@@ -362,9 +368,14 @@ Some **markdown** content.
 
     let schema = result.output.as_ref().expect("Schema should be present");
 
-    // Schema should contain React.createElement or JSX syntax
-    assert!(schema.len() > 0);
     println!("Complex schema output:\n{}", schema);
+
+    // Parse as JSON array
+    let components: Vec<String> = serde_json::from_str(schema)
+        .expect("Schema should be a valid JSON array");
+
+    // Should contain all unique component names, sorted
+    assert_eq!(components, vec!["Container", "Footer", "Header", "List", "ListItem"]);
 }
 
 #[test]
@@ -374,7 +385,7 @@ fn test_schema_output_with_frontmatter() {
     let mut mdx_files = HashMap::new();
     let mdx_content = create_mdx_with_frontmatter(
         "Schema Test",
-        "# {context('title')}\n\n<div>Content</div>",
+        "# {context('title')}\n\n<Alert type=\"info\">Message</Alert>\n\n<Card>Content</Card>",
     );
     mdx_files.insert("schema_frontmatter.mdx".to_string(), mdx_content);
 
@@ -411,7 +422,15 @@ fn test_schema_output_with_frontmatter() {
 
     // Verify schema output is present
     let schema = result.output.as_ref().expect("Schema should be present");
-    assert!(schema.len() > 0);
+
+    println!("Schema with frontmatter output:\n{}", schema);
+
+    // Parse as JSON array
+    let components: Vec<String> = serde_json::from_str(schema)
+        .expect("Schema should be a valid JSON array");
+
+    // Should contain Alert and Card (sorted)
+    assert_eq!(components, vec!["Alert", "Card"]);
 }
 
 #[test]

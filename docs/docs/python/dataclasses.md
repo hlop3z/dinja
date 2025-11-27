@@ -84,6 +84,13 @@ components = ComponentDefinition.from_dict(components_dict)
 OutputFormat = Literal["html", "javascript", "schema", "json"]
 ```
 
+### Output Format Details
+
+- **`html`**: Returns rendered HTML
+- **`javascript`**: Returns JavaScript code (Preact syntax with h() and Fragment)
+- **`schema`**: Returns a JSON array of unique component names (elements starting with capital letters) found in the MDX content
+- **`json`**: Returns a JSON representation of the transformed JSX tree
+
 ## Examples
 
 ### Using Dataclasses

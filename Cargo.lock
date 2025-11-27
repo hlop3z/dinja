@@ -674,6 +674,7 @@ dependencies = [
  "oxc_transformer",
  "oxc_traverse",
  "proptest",
+ "regex",
  "serde",
  "serde_json",
  "thiserror 2.0.17",

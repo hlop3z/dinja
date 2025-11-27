@@ -95,8 +95,8 @@ Welcome to the custom components example!
         "components": components,
     }
 
-    # Test all three output formats
-    output_formats = ["html", "javascript", "schema"]
+    # Test all four output formats
+    output_formats = ["html", "javascript", "schema", "json"]
 
     for output_format in output_formats:
         print(f"\n{'=' * 60}")
@@ -221,6 +221,26 @@ Welcome to the custom components example!
                         else:
                             print(f"  ✗ {description}: Not found")
                 elif output_format == "schema":
+                    print("Verification:")
+                    # Schema should be a JSON array of component names
+                    try:
+                        import json
+                        components = json.loads(output)
+                        if isinstance(components, list):
+                            print(f"  ✓ Valid JSON array")
+                            print(f"  ✓ Found {len(components)} unique components: {components}")
+                            # Check for expected components
+                            expected = ["Button", "Card", "Greeting"]
+                            for comp in expected:
+                                if comp in components:
+                                    print(f"  ✓ {comp}: Found")
+                                else:
+                                    print(f"  ✗ {comp}: Not found")
+                        else:
+                            print(f"  ✗ Invalid format: Expected array, got {type(components)}")
+                    except json.JSONDecodeError:
+                        print(f"  ✗ Invalid JSON format")
+                elif output_format == "json":
                     print("Verification:")
                     checks = [
                         ("{", "JSON structure"),

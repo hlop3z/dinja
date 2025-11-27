@@ -10,8 +10,14 @@
 
 set -e
 
+# Get the directory where this script is located (utils/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+
+# Get the project root directory (parent of utils/)
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Change to project root for all operations
+cd "$PROJECT_ROOT"
 
 # Colors for output
 RED='\033[0;31m'
@@ -232,7 +238,7 @@ test_rust() {
 
 # Setup virtualenv for maturin (maturin requires VIRTUAL_ENV to be set)
 setup_maturin_venv() {
-    local venv_path="$SCRIPT_DIR/python-bindings/.venv"
+    local venv_path="$PROJECT_ROOT/python-bindings/.venv"
     
     # Check if virtualenv already exists
     if [ -d "$venv_path" ]; then
@@ -261,7 +267,7 @@ setup_maturin_venv() {
 
 # Get Python executable inside the managed virtualenv
 get_venv_python() {
-    local venv_path="$SCRIPT_DIR/python-bindings/.venv"
+    local venv_path="$PROJECT_ROOT/python-bindings/.venv"
     if [ -x "$venv_path/bin/python" ]; then
         echo "$venv_path/bin/python"
         return 0

@@ -91,7 +91,18 @@ Build Docker image for the Dinja HTTP server using scratch base image.
 
 ## Notes
 
-- All scripts should be run from the project root directory
+- **Scripts can be run from anywhere**: The scripts automatically detect the project root directory, so you can run them from any location:
+  ```bash
+  # From project root
+  ./utils/build.sh test
+
+  # From subdirectory
+  cd core && ../utils/build.sh test
+
+  # From utils directory
+  cd utils && ./build.sh test
+  ```
 - Scripts are executable (`chmod +x utils/*.sh`)
+- All operations are performed relative to the project root, not the script location
 - See [DOCKER.md](../DOCKER.md) for detailed Docker deployment instructions
 - See [docs/development/](../docs/docs/development/) for development guides

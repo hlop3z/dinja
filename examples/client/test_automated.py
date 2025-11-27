@@ -262,7 +262,7 @@ Welcome!
         print("\nTesting output formats:")
         print("-" * 60)
         
-        formats = ["html", "javascript", "schema"]
+        formats = ["html", "javascript", "schema", "json"]
         results = {}
         
         for fmt in formats:
