@@ -1,7 +1,7 @@
-"""Example: Rendering HTML with custom components via HTTP server.
+"""Example: Testing all output formats with custom components via HTTP server.
 
 This example demonstrates how to use the HTTP server to render MDX files
-with custom components to HTML output.
+with custom components to all three output formats: HTML, JavaScript, and Schema.
 
 Make sure the server is running first:
     ./run.sh
@@ -23,8 +23,8 @@ except ImportError:
 
 
 def main() -> None:
-    """Demonstrate custom component rendering to HTML via HTTP server."""
-    print("Custom Components HTML Rendering Example (HTTP Client)")
+    """Demonstrate custom component rendering to all output formats via HTTP server."""
+    print("Custom Components - All Output Formats Test (HTTP Client)")
     print("=" * 60)
     print()
 
@@ -97,136 +97,182 @@ Welcome to the custom components example!
         "components": components,
     }
 
-    print("Sending render request to server...")
-    print("-" * 60)
+    # Test all three output formats
+    output_formats = ["html", "javascript", "schema"]
 
-    try:
-        # Make HTTP POST request to the server
-        response = requests.post(
-            render_endpoint,
-            json=payload,
-            headers={"Content-Type": "application/json"},
-            timeout=30,
-        )
+    for output_format in output_formats:
+        print(f"\n{'=' * 60}")
+        print(f"Testing {output_format.upper()} output format")
+        print("=" * 60)
 
-        # Check HTTP status
-        if response.status_code == 200:
-            result = response.json()
-        elif response.status_code == 207:  # Multi-Status
-            result = response.json()
-            print("⚠ Warning: Some files failed to render (207 Multi-Status)")
-        elif response.status_code == 400:
-            error_data = response.json()
-            print(f"✗ Bad Request: {error_data.get('error', 'Unknown error')}")
-            sys.exit(1)
-        elif response.status_code == 403:
-            error_data = response.json()
-            print(f"✗ Forbidden: {error_data.get('error', 'Unknown error')}")
-            sys.exit(1)
-        elif response.status_code == 500:
-            try:
+        # Update payload for this output format
+        test_payload = payload.copy()
+        test_payload["settings"] = payload["settings"].copy()
+        test_payload["settings"]["output"] = output_format
+
+        print(f"Sending render request for {output_format}...")
+        print("-" * 60)
+
+        try:
+            # Make HTTP POST request to the server
+            response = requests.post(
+                render_endpoint,
+                json=test_payload,
+                headers={"Content-Type": "application/json"},
+                timeout=30,
+            )
+
+            # Check HTTP status
+            if response.status_code == 200:
+                result = response.json()
+            elif response.status_code == 207:  # Multi-Status
+                result = response.json()
+                print("⚠ Warning: Some files failed to render (207 Multi-Status)")
+            elif response.status_code == 400:
                 error_data = response.json()
-                error_msg = error_data.get("error", "Unknown error")
-                print(f"✗ Internal Server Error: {error_msg}")
-                # Print full error details if available
-                if "error_chain" in error_data:
-                    print("\nFull error details:")
-                    print(error_data["error_chain"])
-            except json.JSONDecodeError:
-                print("✗ Internal Server Error (non-JSON response):")
-                print(f"Status: {response.status_code}")
-                print(f"Response: {response.text[:500]}")
-            sys.exit(1)
-        else:
-            print(f"✗ Unexpected status code: {response.status_code}")
-            print(f"Response headers: {dict(response.headers)}")
-            print(f"Response text: {response.text[:500]}")
-            try:
+                print(f"✗ Bad Request: {error_data.get('error', 'Unknown error')}")
+                continue
+            elif response.status_code == 403:
                 error_data = response.json()
-                print(f"Response JSON: {json.dumps(error_data, indent=2)}")
-            except json.JSONDecodeError:
-                pass
-            sys.exit(1)
+                print(f"✗ Forbidden: {error_data.get('error', 'Unknown error')}")
+                continue
+            elif response.status_code == 500:
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get("error", "Unknown error")
+                    print(f"✗ Internal Server Error: {error_msg}")
+                    # Print full error details if available
+                    if "error_chain" in error_data:
+                        print("\nFull error details:")
+                        print(error_data["error_chain"])
+                except json.JSONDecodeError:
+                    print("✗ Internal Server Error (non-JSON response):")
+                    print(f"Status: {response.status_code}")
+                    print(f"Response: {response.text[:500]}")
+                continue
+            else:
+                print(f"✗ Unexpected status code: {response.status_code}")
+                print(f"Response text: {response.text[:500]}")
+                continue
 
-        # Check results
-        print(f"Total files: {result['total']}")
-        print(f"Succeeded: {result['succeeded']}")
-        print(f"Failed: {result['failed']}")
-        print()
-
-        if result["failed"] > 0:
-            print("Errors:")
-            for error in result.get("errors", []):
-                print(f"  - {error['file']}: {error['message']}")
+            # Check results
+            print(f"Total files: {result['total']}")
+            print(f"Succeeded: {result['succeeded']}")
+            print(f"Failed: {result['failed']}")
             print()
 
-        # Display rendered output
-        file_result = result["files"]["demo.mdx"]
+            if result["failed"] > 0:
+                print("Errors:")
+                for error in result.get("errors", []):
+                    print(f"  - {error['file']}: {error['message']}")
+                print()
 
-        if file_result["status"] == "success":
-            rendered = file_result["result"]
-            metadata = rendered.get("metadata", {})
-            output = rendered.get("output", "")
+            # Display rendered output
+            file_result = result["files"]["demo.mdx"]
 
-            print("✓ Rendering successful!")
-            print()
-            print("Metadata:")
-            print(f"  Title: {metadata.get('title', 'N/A')}")
-            print(f"  Author: {metadata.get('author', 'N/A')}")
-            print()
+            if file_result["status"] == "success":
+                rendered = file_result["result"]
+                metadata = rendered.get("metadata", {})
+                output = rendered.get("output", "")
 
-            print("Rendered HTML:")
-            print("-" * 60)
-            print(output)
-            print("-" * 60)
-            print()
+                print("✓ Rendering successful!")
+                print()
+                print("Metadata:")
+                print(f"  Title: {metadata.get('title', 'N/A')}")
+                print(f"  Author: {metadata.get('author', 'N/A')}")
+                print()
 
-            # Verify key HTML elements
-            print("Verification:")
-            checks = [
-                ("<h1>", "Heading 1"),
-                ("<button", "Button component"),
-                ("<div", "Card component"),
-                ("Hello,", "Greeting component"),
-                ("<strong>World</strong>", "Nested content"),
-            ]
-
-            for check, description in checks:
-                if check in output:
-                    print(f"  ✓ {description}: Found")
+                print(f"Rendered {output_format.upper()} output:")
+                print("-" * 60)
+                # Truncate long outputs for display
+                if len(output) > 500:
+                    print(output[:500])
+                    print(f"... (truncated, total length: {len(output)} characters)")
                 else:
-                    print(f"  ✗ {description}: Not found")
+                    print(output)
+                print("-" * 60)
+                print()
 
-        else:
-            print(f"✗ Rendering failed: {file_result.get('error', 'Unknown error')}")
+                # Verify key elements based on output format
+                if output_format == "html":
+                    print("Verification:")
+                    checks = [
+                        ("<h1>", "Heading 1"),
+                        ("<button", "Button component"),
+                        ("<div", "Card component"),
+                        ("Hello,", "Greeting component"),
+                        ("<strong>World</strong>", "Nested content"),
+                    ]
 
-    except requests.exceptions.ConnectionError:
-        print(f"✗ Connection error: Could not connect to server at {render_endpoint}")
-        print("\nMake sure the server is running:")
-        print("  ./run.sh")
-        print("  # or")
-        print("  cd core && cargo run --features http")
-        sys.exit(1)
-    except requests.exceptions.Timeout as e:
-        print(f"✗ Request timeout: {e}")
-        print("The server took too long to respond. Try again.")
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print(f"✗ HTTP request error: {e}")
-        sys.exit(1)
-    except json.JSONDecodeError as e:
-        print(f"✗ Failed to parse JSON response: {e}")
-        print(f"Response text: {response.text[:200]}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"✗ Unexpected error: {e}")
-        import traceback
+                    for check, description in checks:
+                        if check in output:
+                            print(f"  ✓ {description}: Found")
+                        else:
+                            print(f"  ✗ {description}: Not found")
+                elif output_format == "javascript":
+                    print("Verification:")
+                    checks = [
+                        ("function", "Function definition"),
+                        ("h(", "JSX transformation"),
+                        ("engine", "Engine reference"),
+                    ]
 
-        traceback.print_exc()
+                    for check, description in checks:
+                        if check in output:
+                            print(f"  ✓ {description}: Found")
+                        else:
+                            print(f"  ✗ {description}: Not found")
+                elif output_format == "schema":
+                    print("Verification:")
+                    checks = [
+                        ("{", "JSON structure"),
+                        ('"type"', "Type field"),
+                        ('"props"', "Props field"),
+                    ]
+
+                    for check, description in checks:
+                        if check in output:
+                            print(f"  ✓ {description}: Found")
+                        else:
+                            print(f"  ✗ {description}: Not found")
+
+            else:
+                print(
+                    f"✗ Rendering failed: {file_result.get('error', 'Unknown error')}"
+                )
+
+        except requests.exceptions.ConnectionError:
+            print(
+                f"✗ Connection error: Could not connect to server at {render_endpoint}"
+            )
+            print("\nMake sure the server is running:")
+            print("  ./run.sh")
+            print("  # or")
+            print("  cd core && cargo run --features http")
+            break
+        except requests.exceptions.Timeout as e:
+            print(f"✗ Request timeout: {e}")
+            print("The server took too long to respond. Try again.")
+            continue
+        except requests.exceptions.RequestException as e:
+            print(f"✗ HTTP request error: {e}")
+            continue
+        except json.JSONDecodeError as e:
+            print(f"✗ Failed to parse JSON response: {e}")
+            if "response" in locals():
+                print(f"Response text: {response.text[:200]}")
+            continue
+        except Exception as e:
+            print(f"✗ Unexpected error: {e}")
+            import traceback
+
+            traceback.print_exc()
+            continue
 
     print()
     print("=" * 60)
-    print("Example completed!")
+    print("All output formats tested!")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
