@@ -114,17 +114,24 @@ class Settings:
     Attributes:
         output: Output format (default: "html")
         minify: Enable minification (default: True)
+        utils: Optional JavaScript snippet to inject as global utilities.
+            Must use `export default { ... }` syntax.
+            Example: "export default { greeting: 'Hello', emoji: '👋' }"
     """
 
     output: OutputFormat = "html"
     minify: bool = True
+    utils: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
-        return {
+        result: dict[str, Any] = {
             "output": self.output,
             "minify": self.minify,
         }
+        if self.utils is not None:
+            result["utils"] = self.utils
+        return result
 
 
 @dataclass
