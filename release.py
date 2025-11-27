@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "cyclopts>=2.9",
+# ]
+# ///
 """
 Release utilities for the dinja workspace, implemented with Cyclopts.
 
@@ -483,7 +490,7 @@ def release(
     if dry_run:
         print(f"[dry-run] Would create git tag {tag} and push to origin.")
         if debug:
-            print(f"[DEBUG] Dry run mode: skipping actual git operations")
+            print("[DEBUG] Dry run mode: skipping actual git operations")
         return
 
     if debug:
