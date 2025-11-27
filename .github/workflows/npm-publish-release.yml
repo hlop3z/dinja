@@ -154,7 +154,7 @@ jobs:
 
       - name: Update version
         working-directory: js-bindings
-        run: npm version ${{ needs.check-tag.outputs.version }} --no-git-tag-version
+        run: npm version ${{ needs.check-tag.outputs.version }} --no-git-tag-version --allow-same-version
 
       - name: Publish to npm
         working-directory: js-bindings

@@ -132,7 +132,7 @@ jobs:
 
       - name: Update version
         working-directory: js-bindings
-        run: npm version ${{ github.event.inputs.version }} --no-git-tag-version
+        run: npm version ${{ github.event.inputs.version }} --no-git-tag-version --allow-same-version
 
       - name: Publish to npm (dry run)
         if: ${{ github.event.inputs.dry_run == 'true' }}
