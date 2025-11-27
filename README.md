@@ -87,6 +87,31 @@ result2 = renderer.render(
 )
 ```
 
+### Accessing Metadata in MDX
+
+Metadata from YAML frontmatter is available via the `context` function:
+
+```python
+result = renderer.render(
+    Input(
+        mdx={
+            "page.mdx": """
+---
+title: Welcome
+author: Alice
+---
+# {context('title')}
+
+By {context('author')}
+"""
+        },
+        settings=Settings(output="html"),
+    )
+)
+```
+
+The `context` function supports nested paths: `context('author.name')` for nested metadata.
+
 `rendered["output"]` contains HTML, JavaScript, or schema code depending on `settings.output`.
 
 More examples live in `python-bindings/examples/`.
