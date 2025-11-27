@@ -17,39 +17,35 @@ use std::collections::HashMap;
 /// JavaScript code that resolves View, Component (for backwards compatibility), module.exports.default, or module.exports
 /// Generates JavaScript code to resolve the main View component for rendering
 /// Throws an error if component is not found.
-pub(super) fn component_resolution_code() -> String {
-    format!(
-        r#"
+pub(super) fn component_resolution_code() -> &'static str {
+    r#"
             let ComponentToRender = typeof View !== 'undefined' ? View : (typeof Component !== 'undefined' ? Component : null);
-            if (!ComponentToRender && module && module.exports) {{
+            if (!ComponentToRender && module && module.exports) {
                 ComponentToRender = module.exports.default || module.exports;
-            }}
-            if (!ComponentToRender && exports) {{
+            }
+            if (!ComponentToRender && exports) {
                 ComponentToRender = exports.default || exports;
-            }}
-            if (!ComponentToRender) {{
+            }
+            if (!ComponentToRender) {
                 throw new Error('Component not found. Expected View, Component or default export.');
-            }}
+            }
     "#
-    )
 }
 
 /// Helper function to resolve a component being registered (NOT the main View)
 /// Returns JavaScript code that resolves Component, module.exports.default, or module.exports
 /// Does NOT look for View - View is the MDX content being rendered, not a component to register
 /// Does not throw an error if component is not found (caller should check).
-pub(super) fn resolve_component_code() -> String {
-    format!(
-        r#"
+pub(super) fn resolve_component_code() -> &'static str {
+    r#"
             let resolved = typeof Component !== 'undefined' ? Component : null;
-            if (!resolved && module && module.exports) {{
+            if (!resolved && module && module.exports) {
                 resolved = module.exports.default || module.exports;
-            }}
-            if (!resolved && exports) {{
+            }
+            if (!resolved && exports) {
                 resolved = exports.default || exports;
-            }}
+            }
     "#
-    )
 }
 
 /// Processes utils code and extracts the object from `export default { ... }`
@@ -96,9 +92,7 @@ pub(super) fn build_render_script_wrapper(
     utils_code: Option<&str>,
 ) -> Result<String, MdxError> {
     // Process utils code if provided
-    let utils_declaration = utils_code
-        .map(process_utils_code)
-        .unwrap_or_else(String::new);
+    let utils_declaration = utils_code.map(process_utils_code).unwrap_or_default();
 
     // Pre-allocate with estimated capacity for better performance
     // Strategy: Sum all input lengths + fixed overhead to avoid reallocations
