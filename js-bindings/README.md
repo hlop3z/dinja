@@ -17,7 +17,7 @@ pnpm add @dinja/core
 ### Basic Example
 
 ```javascript
-const { Renderer } = require('@dinja/core');
+import { Renderer } from '@dinja/core';
 
 // Create a renderer instance (engine loads once)
 const renderer = new Renderer();
@@ -77,6 +77,10 @@ if (result.files['page.mdx'].success) {
 The renderer supports multiple output formats:
 
 ```javascript
+import { Renderer } from '@dinja/core';
+
+const renderer = new Renderer();
+
 // HTML output
 renderer.render({
   settings: { output: 'html', minify: false },
@@ -105,6 +109,10 @@ renderer.render({
 ### Custom Components
 
 ```javascript
+import { Renderer } from '@dinja/core';
+
+const renderer = new Renderer();
+
 const result = renderer.render({
   settings: { output: 'html', minify: false },
   mdx: {
@@ -118,14 +126,10 @@ import { Button } from './button';
     Button: {
       name: 'Button',
       code: `
-export function Button({ children }) {
+export default function Component({ children }) {
   return <button class="custom-btn">{children}</button>;
 }
-      `,
-      docs: 'A custom button component',
-      args: {
-        children: { type: 'string', required: true }
-      }
+      `
     }
   }
 });
@@ -136,6 +140,10 @@ export function Button({ children }) {
 The renderer efficiently handles multiple files in a single call:
 
 ```javascript
+import { Renderer } from '@dinja/core';
+
+const renderer = new Renderer();
+
 const result = renderer.render({
   settings: { output: 'html', minify: false },
   mdx: {
@@ -162,6 +170,8 @@ for (const [filename, outcome] of Object.entries(result.files)) {
 The `Renderer` class maintains a single render service instance and reuses it across multiple renders, which prevents V8 isolate issues and improves performance:
 
 ```javascript
+import { Renderer } from '@dinja/core';
+
 const renderer = new Renderer();
 
 // First render with HTML output
