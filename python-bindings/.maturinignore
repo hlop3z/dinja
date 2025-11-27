@@ -1,3 +1,0 @@
-# Ignore root README.md to avoid conflict with python-bindings/README.md
-../README.md
-

@@ -24,9 +24,6 @@ build-backend = "maturin"
 [tool.maturin]
 module-name = "dinja._native"
 bindings = "pyo3"
-# Exclude root README.md to avoid conflict with python-bindings/README.md
-# The exclude pattern prevents maturin from including the parent README.md
-exclude = ["../README.md"]
 
 [dependency-groups]
 dev = [
