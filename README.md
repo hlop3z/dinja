@@ -2,19 +2,24 @@
 
 ![Dinja Logo](docs/docs/assets/media/logo.png)
 
-[![License](https://img.shields.io/github/license/hlop3z/dinja?style=flat-square)](LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-github.io-blue?style=flat-square)](https://hlop3z.github.io/dinja)
 [![Python](https://img.shields.io/pypi/v/dinja?style=flat-square)](https://pypi.org/project/dinja/)
 [![Rust](https://img.shields.io/crates/v/dinja-core?style=flat-square)](https://crates.io/crates/dinja-core)
-[![Python Version](https://img.shields.io/pypi/pyversions/dinja?style=flat-square)](https://pypi.org/project/dinja/)
 [![GitHub stars](https://img.shields.io/github/stars/hlop3z/dinja?style=flat-square)](https://github.com/hlop3z/dinja/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/hlop3z/dinja?style=flat-square)](https://github.com/hlop3z/dinja/issues)
-[![GitHub forks](https://img.shields.io/github/forks/hlop3z/dinja?style=flat-square)](https://github.com/hlop3z/dinja/network/members)
+[![License](https://img.shields.io/github/license/hlop3z/dinja?style=flat-square)](LICENSE)
 
 </div>
 
 # Dinja
 
 Safe, deterministic MDX rendering powered by a Rust core with batteries-included Python bindings.
+
+## Links
+
+- [Read the Docs](https://hlop3z.github.io/dinja)
+- [GitHub](https://github.com/hlop3z/dinja)
+- [PyPI](https://pypi.org/project/dinja)
+- [Crates.io](https://crates.io/crates/dinja-core)
 
 ## Installation
 

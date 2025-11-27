@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.13"
-# dependencies = [
-#     "cyclopts>=2.9",
-# ]
-# ///
 """
 Release utilities for the dinja workspace, implemented with Cyclopts.
 
@@ -12,7 +5,7 @@ Commands:
 
   * bump: update version strings for the Rust workspace and/or Python bindings.
           Examples:
-              uv run release.py bump --version 0.3.0          # update both
+              uv run release.py bump --version 0.3.0          # update both (use --version flag)
               uv run release.py bump --python-version 0.2.5   # python only
               uv run release.py bump --rust-version 0.2.1     # rust only
 
@@ -21,6 +14,7 @@ Commands:
              script). Versions must already be updated and committed.
               uv run release.py release 0.3.0
 """
+
 from __future__ import annotations
 
 import importlib
@@ -152,7 +146,11 @@ def run_cmd(
     if debug:
         print(f"[DEBUG] Working directory: {cwd or Path.cwd()}")
         if env:
-            relevant_env = {k: v for k, v in env.items() if k.startswith("PYO3_") or k == "VIRTUAL_ENV"}
+            relevant_env = {
+                k: v
+                for k, v in env.items()
+                if k.startswith("PYO3_") or k == "VIRTUAL_ENV"
+            }
             if relevant_env:
                 print(f"[DEBUG] Environment: {relevant_env}")
     subprocess.run(cmd, cwd=cwd, env=env, check=True)
@@ -187,7 +185,7 @@ def ensure_clean_tree(debug: bool = False) -> None:
 def ensure_uv_python(debug: bool = False) -> dict:
     if debug:
         print("[DEBUG] Checking for uv and Python interpreter...")
-    
+
     if shutil.which("uv") is None:
         raise ReleaseError(
             "uv is required (install it from https://docs.astral.sh/uv/)."
@@ -224,7 +222,7 @@ def run_release_checks(*, skip_tests: bool, env: dict, debug: bool = False) -> N
     if debug:
         print("[DEBUG] Starting release checks...")
         print(f"[DEBUG] Skip tests: {skip_tests}")
-    
+
     run_cmd(["cargo", "fmt", "--all", "--check"], env=env, debug=debug)
     run_cmd(
         [
@@ -245,12 +243,12 @@ def run_release_checks(*, skip_tests: bool, env: dict, debug: bool = False) -> N
     run_cmd(["uv", "sync", "--dev"], cwd=PYTHON_BINDINGS, env=env, debug=debug)
     if not skip_tests:
         run_cmd(["uv", "run", "pytest"], cwd=PYTHON_BINDINGS, env=env, debug=debug)
-    
+
     if debug:
         print("[DEBUG] All release checks completed successfully")
 
 
-app = App(help=__doc__)
+app = App(help=__doc__, version_flags="")
 
 
 def _default_commit_message(
@@ -279,24 +277,43 @@ def _default_commit_message(
 
 @app.command(help="Update version strings in project files.")
 def bump(
-    version: Annotated[str | None, Parameter(help="Version applied to both the Rust workspace and Python bindings.")] = None,
-    rust_version: Annotated[str | None, Parameter(help="Version applied only to the Rust workspace.")] = None,
-    python_version: Annotated[str | None, Parameter(help="Version applied only to the Python bindings.")] = None,
-    dry_run: Annotated[bool, Parameter(help="Show planned edits without touching the files.")] = False,
-    commit: Annotated[bool, Parameter(help="Automatically commit the version bump.")] = True,
-    commit_message: Annotated[str | None, Parameter(help="Custom commit message (defaults to 'chore: bump ...').")] = None,
-    debug: Annotated[bool, Parameter(help="Enable debug output with verbose logging.")] = False,
+    target_version: Annotated[
+        str | None,
+        Parameter(
+            name="--version",
+            help="Version applied to both the Rust workspace and Python bindings.",
+        ),
+    ] = None,
+    rust_version: Annotated[
+        str | None, Parameter(help="Version applied only to the Rust workspace.")
+    ] = None,
+    python_version: Annotated[
+        str | None, Parameter(help="Version applied only to the Python bindings.")
+    ] = None,
+    dry_run: Annotated[
+        bool, Parameter(help="Show planned edits without touching the files.")
+    ] = False,
+    commit: Annotated[
+        bool, Parameter(help="Automatically commit the version bump.")
+    ] = True,
+    commit_message: Annotated[
+        str | None,
+        Parameter(help="Custom commit message (defaults to 'chore: bump ...')."),
+    ] = None,
+    debug: Annotated[
+        bool, Parameter(help="Enable debug output with verbose logging.")
+    ] = False,
 ) -> None:
     if debug:
         print("[DEBUG] Version bump operation starting...")
-        print(f"[DEBUG] version: {version!r}")
+        print(f"[DEBUG] target_version: {target_version!r}")
         print(f"[DEBUG] rust_version: {rust_version!r}")
         print(f"[DEBUG] python_version: {python_version!r}")
         print(f"[DEBUG] dry_run: {dry_run}")
         print(f"[DEBUG] commit: {commit}")
-    
-    rust_version = rust_version or version
-    python_version = python_version or version
+
+    rust_version = rust_version or target_version
+    python_version = python_version or target_version
     if not rust_version and not python_version:
         raise ReleaseError(
             "Specify --version for both components or at least one of "
@@ -332,10 +349,20 @@ def release(
     version: str = Parameter(
         help="Semantic version that must already match Cargo.toml and pyproject.toml."
     ),
-    skip_tests: Annotated[bool, Parameter(help="Skip Rust and Python tests (still runs fmt/clippy/uv sync).")] = False,
-    no_push: Annotated[bool, Parameter(help="Create the tag locally without pushing HEAD/tag to origin.")] = False,
-    dry_run: Annotated[bool, Parameter(help="Run checks but do not create or push the git tag.")] = False,
-    debug: Annotated[bool, Parameter(help="Enable debug output with verbose logging.")] = False,
+    skip_tests: Annotated[
+        bool,
+        Parameter(help="Skip Rust and Python tests (still runs fmt/clippy/uv sync)."),
+    ] = False,
+    no_push: Annotated[
+        bool,
+        Parameter(help="Create the tag locally without pushing HEAD/tag to origin."),
+    ] = False,
+    dry_run: Annotated[
+        bool, Parameter(help="Run checks but do not create or push the git tag.")
+    ] = False,
+    debug: Annotated[
+        bool, Parameter(help="Enable debug output with verbose logging.")
+    ] = False,
 ) -> None:
     if debug:
         print("[DEBUG] Release operation starting...")
@@ -343,12 +370,12 @@ def release(
         print(f"[DEBUG] skip_tests: {skip_tests}")
         print(f"[DEBUG] no_push: {no_push}")
         print(f"[DEBUG] dry_run: {dry_run}")
-    
+
     # Check if we need to update versions first
     versions = read_current_versions()
     if debug:
         print(f"[DEBUG] Current versions: {versions}")
-    
+
     expected = version
     mismatches = {
         component: value for component, value in versions.items() if value != expected
@@ -361,7 +388,7 @@ def release(
         if debug:
             print(f"[DEBUG] Version mismatch detected: {mismatch_lines}")
             print(f"[DEBUG] Automatically updating all versions to {expected}...")
-        
+
         # Automatically update versions (both rust and python)
         changed = update_versions(rust=expected, python=expected, dry_run=dry_run)
         if changed:
@@ -371,10 +398,21 @@ def release(
             else:
                 print(f"Updated all versions to {expected}")
                 # Commit the version bump automatically
-                msg = _default_commit_message(rust_version=expected, python_version=expected)
+                msg = _default_commit_message(
+                    rust_version=expected, python_version=expected
+                )
                 if debug:
                     print(f"[DEBUG] Committing version bump: {msg}")
-                run_cmd(["git", "add", "Cargo.toml", "python-bindings/pyproject.toml", "python-bindings/dinja/__about__.py"], debug=debug)
+                run_cmd(
+                    [
+                        "git",
+                        "add",
+                        "Cargo.toml",
+                        "python-bindings/pyproject.toml",
+                        "python-bindings/dinja/__about__.py",
+                    ],
+                    debug=debug,
+                )
                 run_cmd(["git", "commit", "-m", msg], debug=debug)
                 # Re-read versions to confirm
                 versions = read_current_versions()
@@ -383,7 +421,7 @@ def release(
         else:
             if debug:
                 print("[DEBUG] No version files needed updating")
-    
+
     # Check tree is clean (after version update/commit if it happened)
     if not version_updated:
         # Normal case: check tree is clean before proceeding
@@ -413,12 +451,14 @@ def release(
             except subprocess.CalledProcessError:
                 pass
             raise ReleaseError("Working tree must be clean before releasing.") from exc
-    
+
     # Final check - ensure versions match after update (skip in dry-run if we showed updates)
     if not (dry_run and version_updated):
         versions = read_current_versions()
         final_mismatches = {
-            component: value for component, value in versions.items() if value != expected
+            component: value
+            for component, value in versions.items()
+            if value != expected
         }
         if final_mismatches:
             mismatch_lines = ", ".join(
@@ -427,14 +467,16 @@ def release(
             raise ReleaseError(
                 f"Version mismatch after update. Expected {expected} everywhere but found {mismatch_lines}."
             )
-        
+
         if debug:
             print(f"[DEBUG] Version check passed: all components at {expected}")
     elif debug:
-        print(f"[DEBUG] Skipping final version check (dry-run mode, versions would be updated to {expected})")
+        print(
+            f"[DEBUG] Skipping final version check (dry-run mode, versions would be updated to {expected})"
+        )
 
     env = ensure_uv_python(debug=debug)
-    
+
     run_release_checks(skip_tests=skip_tests, env=env, debug=debug)
 
     tag = f"v{expected}"
@@ -453,7 +495,7 @@ def release(
         print(f"[DEBUG] Writing VERSION file: {version_file}")
     version_file.write_text(f"{expected}\n", encoding="utf-8")
     print(f"Created VERSION file with version {expected}")
-    
+
     if no_push:
         print("Skipping git push (--no-push flag provided).")
         if debug:
