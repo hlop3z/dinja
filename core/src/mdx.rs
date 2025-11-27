@@ -271,17 +271,9 @@ fn render_with_engine_pipeline(
                 .map_err(|e| {
                     MdxError::TsxTransform(format!("Failed to transform TSX to JavaScript: {e}"))
                 })?;
-            eprintln!(
-                "[DEBUG] TSX: {}",
-                javascript_output.chars().take(150).collect::<String>()
-            );
 
             // HOT PATH: Component rendering - executes JavaScript and renders to HTML
             let template_output = render_template(context, &javascript_output)?;
-            eprintln!(
-                "[DEBUG] Result: {}",
-                template_output.chars().take(150).collect::<String>()
-            );
 
             match context.settings.output {
                 OutputFormat::Html => {

@@ -103,10 +103,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f1/2a/8c3ac3d8bc94e6de8d7ae270bb5bc437b210bb9d6d9e46630c98f4abd20c/csscompressor-0.9.5.tar.gz", hash = "sha256:afa22badbcf3120a4f392e4d22f9fff485c044a1feda4a950ecc5eba9dd31a05", size = 237808, upload-time = "2017-11-26T21:13:08.238Z" }
 
 [[package]]
+name = "dinja"
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/1f/e1f38d42a1f18667fa687e2cac7e24289820279729c3ac27bcebe6f5ba68/dinja-0.3.0.tar.gz", hash = "sha256:fbc260833bc3f47484cb343093146b5fae2577276c3dea2f964ccd1b651104d4", size = 92629, upload-time = "2025-11-27T10:47:19.921Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/20/fd/c2e73936f3f777280c46a58b99bed6629e83fd7f6fec8166f1227ebe1dd0/dinja-0.3.0-cp313-abi3-macosx_10_12_x86_64.whl", hash = "sha256:898552ec112a3bdac5d698650d26bd5b4691f926dd4e1080bd5c4aeaeb9851dd", size = 19097163, upload-time = "2025-11-27T10:47:10.413Z" },
+    { url = "https://files.pythonhosted.org/packages/65/23/1866a92cde945f36cfde5a8d9c588711d582b0cd66a8da1c55e7f6b43053/dinja-0.3.0-cp313-abi3-macosx_11_0_arm64.whl", hash = "sha256:638a2b4e1ea0124eaa300e1661303f94dcc73b2966be6abe9a1891fa9b42f658", size = 18318988, upload-time = "2025-11-27T10:47:12.98Z" },
+    { url = "https://files.pythonhosted.org/packages/1c/3c/e93845a453d9125ce16c62d8664c688a7e5d3980af84250331536f4b279f/dinja-0.3.0-cp313-abi3-manylinux_2_34_x86_64.whl", hash = "sha256:1130f8b9e09486fbdf8f4cb2d1564d1c08ece131ea0888ad9c3660f2b622c817", size = 20313262, upload-time = "2025-11-27T10:47:15.243Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/fc/82d3350aa7c59c8badb0bac0c1e3080df752f923062a9ba8c82f22d506fb/dinja-0.3.0-cp313-abi3-win_amd64.whl", hash = "sha256:b075267fdd3203f6dbee0bc2cfdb8884f7ba73731a0470b99b9f598d994bc690", size = 17546128, upload-time = "2025-11-27T10:47:17.687Z" },
+]
+
+[[package]]
 name = "dinja-docs"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "dinja" },
     { name = "mkdocs" },
     { name = "mkdocs-macros-plugin" },
     { name = "mkdocs-material" },
@@ -117,6 +130,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "dinja", specifier = ">=0.3.0" },
     { name = "mkdocs", specifier = ">=1.6.0" },
     { name = "mkdocs-macros-plugin", specifier = ">=1.0.5" },
     { name = "mkdocs-material", specifier = ">=9.5.32" },
