@@ -3,10 +3,6 @@ name: Publish to npm (Manual)
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to publish (e.g., 0.1.0)'
-        required: true
-        type: string
       tag:
         description: 'npm tag (latest, beta, alpha, next)'
         required: true
@@ -25,12 +21,12 @@ on:
 
 jobs:
   build:
-    name: Build ${{ matrix.settings.target }}
-    runs-on: ${{ matrix.settings.host }}
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.host }}
     strategy:
       fail-fast: false
       matrix:
-        settings:
+        include:
           # macOS
           - host: macos-latest
             target: x86_64-apple-darwin
@@ -38,13 +34,11 @@ jobs:
           - host: macos-latest
             target: aarch64-apple-darwin
             build: npm run build -- --target aarch64-apple-darwin
-
           # Windows
           - host: windows-latest
             target: x86_64-pc-windows-msvc
             build: npm run build
-
-          # Linux GNU
+          # Linux
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             build: npm run build -- --target x86_64-unknown-linux-gnu
@@ -61,21 +55,16 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.settings.target }}
+          targets: ${{ matrix.target }}
 
-      - name: Cache cargo registry
+      - name: Cache cargo
         uses: actions/cache@v4
         with:
-          path: ~/.cargo/registry/index
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-registry-
-
-      - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ matrix.settings.target }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ matrix.settings.target }}-cargo-build-
+          path: |
+            ~/.cargo/registry/index
+            target
+          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ matrix.target }}-cargo-
 
       - name: Install dependencies
         working-directory: js-bindings
@@ -83,7 +72,7 @@ jobs:
 
       - name: Build native module
         working-directory: js-bindings
-        run: ${{ matrix.settings.build }}
+        run: ${{ matrix.build }}
         env:
           CARGO_PROFILE_RELEASE_LTO: 'fat'
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '1'
@@ -91,7 +80,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bindings-${{ matrix.settings.target }}
+          name: bindings-${{ matrix.target }}
           path: js-bindings/*.node
           if-no-files-found: error
 
@@ -100,8 +89,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # For creating releases
-      id-token: write  # For npm OIDC publishing
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -111,9 +100,18 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Get version from package.json
+        id: version
+        working-directory: js-bindings
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version: $VERSION"
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: bindings-*
           path: js-bindings/artifacts
 
       - name: Move artifacts to package root
@@ -130,10 +128,6 @@ jobs:
         working-directory: js-bindings
         run: npm install
 
-      - name: Update version
-        working-directory: js-bindings
-        run: npm version ${{ github.event.inputs.version }} --no-git-tag-version --allow-same-version
-
       - name: Publish to npm (dry run)
         if: ${{ github.event.inputs.dry_run == 'true' }}
         working-directory: js-bindings
@@ -143,20 +137,5 @@ jobs:
         if: ${{ github.event.inputs.dry_run != 'true' }}
         working-directory: js-bindings
         run: npm publish --provenance --tag ${{ github.event.inputs.tag }} --access public
-
-      - name: Create GitHub Release
-        if: ${{ github.event.inputs.dry_run != 'true' }}
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ github.event.inputs.version }}
-          name: Release v${{ github.event.inputs.version }}
-          body: |
-            ## @dinja/core v${{ github.event.inputs.version }}
-
-            Published to npm with tag: `${{ github.event.inputs.tag }}`
-
-            Install: `npm install @dinja/core@${{ github.event.inputs.tag }}`
-          draft: false
-          prerelease: ${{ github.event.inputs.tag != 'latest' }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
