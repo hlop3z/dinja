@@ -7,6 +7,6 @@
     "start": "node example.js"
   },
   "dependencies": {
-    "@dinja/core": "file:../../js-bindings"
+    "@dinja/core": "^0.3.1"
   }
 }
