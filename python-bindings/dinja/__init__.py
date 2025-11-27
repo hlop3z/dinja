@@ -250,8 +250,8 @@ class Renderer:
         Args:
             input: Either a `Input` dataclass instance or a dictionary
                 containing:
-                - `settings`: Dictionary with `output` ("html", "javascript", or "schema"),
-                  `minify` (bool), `engine` ("base" or "custom"), `components` (list of strings)
+                - `settings`: Dictionary with `output` ("html", "javascript", "schema", or "json"),
+                  `minify` (bool), and optionally `utils` (str)
                 - `mdx`: Dictionary mapping file names to MDX content strings
                 - `components`: Optional dictionary mapping component names to component definitions
 
