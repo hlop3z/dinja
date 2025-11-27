@@ -230,7 +230,19 @@ def run_release_checks(*, skip_tests: bool, env: dict, debug: bool = False) -> N
         print("[DEBUG] Starting release checks...")
         print(f"[DEBUG] Skip tests: {skip_tests}")
 
-    run_cmd(["cargo", "fmt", "--all", "--check"], env=env, debug=debug)
+    # Check formatting first, and auto-fix if needed
+    try:
+        run_cmd(["cargo", "fmt", "--all", "--check"], env=env, debug=debug)
+    except subprocess.CalledProcessError:
+        print("Code formatting check failed. Auto-formatting code...")
+        run_cmd(["cargo", "fmt", "--all"], env=env, debug=debug)
+        print("Code formatted. Committing formatting changes...")
+        run_cmd(["git", "add", "-u"], env=env, debug=debug)
+        run_cmd(
+            ["git", "commit", "-m", "style: auto-format code"], env=env, debug=debug
+        )
+        print("Formatting changes committed. Re-running format check...")
+        run_cmd(["cargo", "fmt", "--all", "--check"], env=env, debug=debug)
     run_cmd(
         [
             "cargo",
