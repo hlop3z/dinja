@@ -99,8 +99,8 @@ impl Renderer {
     ///
     /// # Arguments
     /// * `input_dict` - Dictionary containing:
-    ///   - `settings`: Dictionary with `output` ("html", "javascript", or "schema"),
-    ///     `minify` (bool), `engine` ("base" or "custom"), `components` (list of strings)
+    ///   - `settings`: Dictionary with `output` ("html", "javascript", "schema", or "json"),
+    ///     `minify` (bool)
     ///   - `mdx`: Dictionary mapping file names to MDX content strings
     ///   - `components`: Optional dictionary mapping component names to component definitions
     ///
@@ -165,7 +165,7 @@ fn _native<'py>(_py: Python<'py>, m: &Bound<'py, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dinja_core::models::{NamedMdxBatchInput, OutputFormat, RenderEngine, RenderSettings};
+    use dinja_core::models::{NamedMdxBatchInput, OutputFormat, RenderSettings};
     use std::collections::HashMap;
     use std::fs;
     use std::path::PathBuf;
@@ -219,8 +219,6 @@ mod tests {
             settings: RenderSettings {
                 output,
                 minify: true,
-                engine: RenderEngine::Base,
-                components: vec!["Button".to_string()],
             },
             mdx,
             components: None,
@@ -629,8 +627,6 @@ mod tests {
             settings: RenderSettings {
                 output: OutputFormat::Html,
                 minify: true,
-                engine: RenderEngine::Custom,
-                components: vec![],
             },
             mdx,
             components: Some(components),

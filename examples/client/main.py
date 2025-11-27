@@ -88,8 +88,6 @@ Welcome to the custom components example!
         "settings": {
             "output": "html",
             "minify": False,  # Set to False for readable output
-            "engine": "custom",
-            "components": [],
         },
         "mdx": {
             "demo.mdx": mdx_content,

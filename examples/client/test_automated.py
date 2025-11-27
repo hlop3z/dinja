@@ -144,8 +144,6 @@ def test_output_format(
         "settings": {
             "output": output_format,
             "minify": False,
-            "engine": "custom",
-            "components": [],
         },
         "mdx": {"test.mdx": mdx_content},
         "components": components,

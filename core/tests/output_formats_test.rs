@@ -3,7 +3,7 @@
 //! These tests verify that the RenderService correctly processes MDX content
 //! and produces the expected output for each format.
 
-use dinja_core::models::{NamedMdxBatchInput, OutputFormat, RenderEngine, RenderSettings};
+use dinja_core::models::{NamedMdxBatchInput, OutputFormat, RenderSettings};
 use dinja_core::service::{FileRenderStatus, RenderService, RenderServiceConfig};
 use std::collections::HashMap;
 use std::env;
@@ -42,8 +42,6 @@ fn test_html_output_simple_markdown() {
         settings: RenderSettings {
             output: OutputFormat::Html,
             minify: true,
-            engine: RenderEngine::Base,
-            components: Vec::new(),
         },
         mdx: mdx_files,
         components: None,
@@ -88,8 +86,6 @@ fn test_html_output_with_frontmatter() {
         settings: RenderSettings {
             output: OutputFormat::Html,
             minify: true,
-            engine: RenderEngine::Base,
-            components: Vec::new(),
         },
         mdx: mdx_files,
         components: None,
@@ -133,8 +129,6 @@ fn test_html_output_minified() {
         settings: RenderSettings {
             output: OutputFormat::Html,
             minify: true,
-            engine: RenderEngine::Base,
-            components: Vec::new(),
         },
         mdx: mdx_files,
         components: None,
@@ -171,8 +165,6 @@ fn test_html_output_with_jsx() {
         settings: RenderSettings {
             output: OutputFormat::Html,
             minify: true,
-            engine: RenderEngine::Base,
-            components: Vec::new(),
         },
         mdx: mdx_files,
         components: None,
@@ -208,8 +200,6 @@ fn test_javascript_output_format() {
         settings: RenderSettings {
             output: OutputFormat::Javascript,
             minify: true,
-            engine: RenderEngine::Base,
-            components: Vec::new(),
         },
         mdx: mdx_files,
         components: None,
@@ -251,8 +241,6 @@ fn test_javascript_output_with_frontmatter() {
         settings: RenderSettings {
             output: OutputFormat::Javascript,
             minify: true,
-            engine: RenderEngine::Base,
-            components: Vec::new(),
         },
         mdx: mdx_files,
         components: None,
@@ -297,8 +285,6 @@ fn test_schema_output_format() {
         settings: RenderSettings {
             output: OutputFormat::Schema,
             minify: false,
-            engine: RenderEngine::Base,
-            components: Vec::new(),
         },
         mdx: mdx_files,
         components: None,
@@ -354,8 +340,6 @@ Some **markdown** content.
         settings: RenderSettings {
             output: OutputFormat::Schema,
             minify: false,
-            engine: RenderEngine::Base,
-            components: Vec::new(),
         },
         mdx: mdx_files,
         components: None,
@@ -398,8 +382,6 @@ fn test_schema_output_with_frontmatter() {
         settings: RenderSettings {
             output: OutputFormat::Schema,
             minify: false,
-            engine: RenderEngine::Base,
-            components: Vec::new(),
         },
         mdx: mdx_files,
         components: None,
@@ -445,8 +427,6 @@ fn test_batch_multiple_files_different_formats() {
         settings: RenderSettings {
             output: OutputFormat::Html,
             minify: true,
-            engine: RenderEngine::Base,
-            components: Vec::new(),
         },
         mdx: mdx_files_html,
         components: None,
@@ -467,8 +447,6 @@ fn test_batch_multiple_files_different_formats() {
         settings: RenderSettings {
             output: OutputFormat::Javascript,
             minify: true,
-            engine: RenderEngine::Base,
-            components: Vec::new(),
         },
         mdx: mdx_files_js,
         components: None,
@@ -489,8 +467,6 @@ fn test_batch_multiple_files_different_formats() {
         settings: RenderSettings {
             output: OutputFormat::Schema,
             minify: false,
-            engine: RenderEngine::Base,
-            components: Vec::new(),
         },
         mdx: mdx_files_schema,
         components: None,
@@ -512,8 +488,6 @@ fn test_empty_batch() {
         settings: RenderSettings {
             output: OutputFormat::Html,
             minify: true,
-            engine: RenderEngine::Base,
-            components: Vec::new(),
         },
         mdx: HashMap::new(),
         components: None,
@@ -548,8 +522,6 @@ fn test_output_format_consistency() {
             settings: RenderSettings {
                 output: format.clone(),
                 minify: true,
-                engine: RenderEngine::Base,
-                components: Vec::new(),
             },
             mdx: mdx_files,
             components: None,

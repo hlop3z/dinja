@@ -45,7 +45,7 @@ renderer = Renderer()
 result = renderer.render(
     Input(
         mdx={"page.mdx": mdx_content},
-        settings=Settings(engine="custom"),
+        settings=Settings(),
         components=components,
     )
 )

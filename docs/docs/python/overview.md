@@ -40,10 +40,8 @@ Configuration for rendering behavior.
 from dinja import Settings
 
 settings = Settings(
-    output="html",      # "html" | "javascript" | "schema"
+    output="html",      # "html" | "javascript" | "schema" | "json"
     minify=True,        # Enable minification
-    engine="base",      # "base" | "custom"
-    components=[]       # Component names for base engine
 )
 ```
 

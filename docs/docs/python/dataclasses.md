@@ -35,10 +35,8 @@ Rendering configuration.
 ```python
 @dataclass
 class Settings:
-    output: OutputFormat = "html"  # "html" | "javascript" | "schema"
+    output: OutputFormat = "html"  # "html" | "javascript" | "schema" | "json"
     minify: bool = True
-    engine: RenderEngine = "base"  # "base" | "custom"
-    components: list[str] = []  # Component names for base engine
 ```
 
 ## ComponentDefinition
@@ -83,8 +81,7 @@ components = ComponentDefinition.from_dict(components_dict)
 ## Type Aliases
 
 ```python
-OutputFormat = Literal["html", "javascript", "schema"]
-RenderEngine = Literal["base", "custom"]
+OutputFormat = Literal["html", "javascript", "schema", "json"]
 ```
 
 ## Examples
@@ -102,8 +99,7 @@ from dinja import (
 # Create settings
 settings = Settings(
     output="html",
-    minify=True,
-    engine="custom"
+    minify=True
 )
 
 # Create components (simple dict format)
@@ -130,12 +126,13 @@ result = renderer.render(input_data)
 result = renderer.render({
     "settings": {
         "output": "html",
-        "minify": True,
-        "engine": "custom"
+        "minify": True
     },
     "mdx": {"page.mdx": "# Hello"},
     "components": {
-        "Button": "function Component(props) { return <button>{props.children}</button>; }"
+        "Button": {
+            "code": "function Component(props) { return <button>{props.children}</button>; }"
+        }
     }
 })
 ```

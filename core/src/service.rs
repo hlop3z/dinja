@@ -33,7 +33,7 @@
 //!
 //! ```no_run
 //! use dinja_core::service::{RenderService, RenderServiceConfig};
-//! use dinja_core::models::{NamedMdxBatchInput, RenderSettings, OutputFormat, RenderEngine};
+//! use dinja_core::models::{NamedMdxBatchInput, RenderSettings, OutputFormat};
 //! use std::collections::HashMap;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -47,8 +47,6 @@
 //!     settings: RenderSettings {
 //!         output: OutputFormat::Html,
 //!         minify: true,
-//!         engine: RenderEngine::Base,
-//!         components: Vec::new(),
 //!     },
 //!     mdx: mdx_files,
 //!     components: None,
@@ -60,7 +58,7 @@
 //! ```
 use crate::mdx::{create_error_response, mdx_to_html_with_frontmatter};
 use crate::models::{
-    ComponentDefinition, NamedMdxBatchInput, OutputFormat, RenderEngine, RenderedMdx,
+    ComponentDefinition, NamedMdxBatchInput, OutputFormat, RenderedMdx,
     ResourceLimits,
 };
 use crate::renderer::pool::{RendererPool, RendererProfile};
@@ -330,8 +328,8 @@ impl RenderService {
         &self,
         input: &NamedMdxBatchInput,
     ) -> Result<BatchRenderOutcome, RenderBatchError> {
-        let components_context = self.resolve_components(input)?;
-        let resolved_components = components_context.as_ref();
+        // Use components from input directly
+        let resolved_components = input.components.as_ref();
 
         // Validate resource limits
         self.validate_resource_limits(input, resolved_components)?;
@@ -445,65 +443,12 @@ impl RenderService {
         format: &OutputFormat,
     ) -> Result<RendererProfile, RenderBatchError> {
         match format {
-            OutputFormat::Html | OutputFormat::Javascript | OutputFormat::Schema => {
+            OutputFormat::Html | OutputFormat::Javascript | OutputFormat::Schema | OutputFormat::Json => {
                 Ok(RendererProfile::Engine)
             }
         }
     }
 
-    fn resolve_components<'a>(
-        &self,
-        input: &'a NamedMdxBatchInput,
-    ) -> Result<ComponentsContext<'a>, RenderBatchError> {
-        match input.settings.engine {
-            RenderEngine::Base => {
-                let generated = build_base_components(&input.settings.components);
-                if generated.is_empty() {
-                    Ok(ComponentsContext::Borrowed(None))
-                } else {
-                    Ok(ComponentsContext::Owned(generated))
-                }
-            }
-            RenderEngine::Custom => Ok(ComponentsContext::Borrowed(input.components.as_ref())),
-        }
-    }
-}
-
-/// Provides shared access to either borrowed or owned component definitions.
-enum ComponentsContext<'a> {
-    Borrowed(Option<&'a HashMap<String, ComponentDefinition>>),
-    Owned(HashMap<String, ComponentDefinition>),
-}
-
-impl<'a> ComponentsContext<'a> {
-    fn as_ref(&self) -> Option<&HashMap<String, ComponentDefinition>> {
-        match self {
-            ComponentsContext::Borrowed(maybe) => *maybe,
-            ComponentsContext::Owned(map) => Some(map),
-        }
-    }
-}
-
-const BASE_COMPONENT_TEMPLATE: &str =
-    "function Component(props) {\n    return <Base {...props} />;\n}\n";
-
-fn build_base_components(component_names: &[String]) -> HashMap<String, ComponentDefinition> {
-    let mut components = HashMap::with_capacity(component_names.len());
-    for name in component_names {
-        let trimmed = name.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let normalized = trimmed.to_string();
-        let definition = ComponentDefinition {
-            name: Some(normalized.clone()),
-            docs: None,
-            args: None,
-            code: String::from(BASE_COMPONENT_TEMPLATE),
-        };
-        components.insert(normalized, definition);
-    }
-    components
 }
 
 /// Errors surfaced by the batch renderer.

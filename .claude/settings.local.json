@@ -12,7 +12,8 @@
       "Bash(uv run maturin:*)",
       "Bash(VIRTUAL_ENV=.venv .venv/Scripts/python.exe -m pytest:*)",
       "Bash(uv run pytest:*)",
-      "Bash(maturin develop:*)"
+      "Bash(maturin develop:*)",
+      "Bash(./utils/build.sh:*)"
     ],
     "deny": [],
     "ask": []

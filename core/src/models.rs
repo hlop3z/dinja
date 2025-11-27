@@ -40,10 +40,9 @@ pub enum OutputFormat {
     Html,
     /// Return JavaScript (transform template back to JS)
     Javascript,
-    /// Return JSON schema representation (same as Json)
+    /// Return unique list of custom component names (elements starting with capital letters)
     Schema,
-    /// Return JSON schema representation (alias for Schema)
-    #[serde(alias = "json")]
+    /// Return JSON representation of the transformed JSX tree
     Json,
 }
 

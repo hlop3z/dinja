@@ -57,7 +57,7 @@ renderer = Renderer()
 result = renderer.render(
     Input(
         mdx={"example.mdx": "---\ntitle: Demo\n---\n# Hello **dinja**"},
-        settings=Settings(output="html", minify=True, engine="base"),
+        settings=Settings(output="html", minify=True),
     )
 )
 

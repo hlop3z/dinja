@@ -84,7 +84,7 @@ class ComponentDefinition:
             # Use in Input
             input_data = Input(
                 mdx={"page.mdx": "# Hello <Button>Click</Button>"},
-                settings=Settings(engine="custom"),
+                settings=Settings(),
                 components=components,
             )
             ```
@@ -114,25 +114,17 @@ class Settings:
     Attributes:
         output: Output format (default: "html")
         minify: Enable minification (default: True)
-        engine: Rendering engine selection (default: "base")
-        components: Component names to autopopulate when using base engine (default: empty list)
     """
 
     output: OutputFormat = "html"
     minify: bool = True
-    engine: RenderEngine = "base"
-    components: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
-        result: dict[str, Any] = {
+        return {
             "output": self.output,
             "minify": self.minify,
-            "engine": self.engine,
         }
-        if self.components:
-            result["components"] = self.components
-        return result
 
 
 @dataclass
@@ -308,7 +300,6 @@ __all__ = [
     "Renderer",
     "_NativeRenderer",
     "OutputFormat",
-    "RenderEngine",
     "ComponentDefinition",
     "Settings",
     "Input",

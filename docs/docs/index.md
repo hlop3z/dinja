@@ -74,7 +74,7 @@ renderer = Renderer()
 result = renderer.render(
     Input(
         mdx={"page.mdx": "# Hello <Button>Click me</Button>"},
-        settings=Settings(engine="custom"),
+        settings=Settings(),
         components=components,
     )
 )

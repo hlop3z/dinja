@@ -3,7 +3,7 @@ from dinja import Renderer
 
 if __name__ == "__main__":
     payload = {
-        "settings": {"output": "schema", "minify": True, "engine": "base"},
+        "settings": {"output": "schema", "minify": True},
         "mdx": {"example.mdx": "---\ntitle: Demo\n---\n# Hello **dinja**"},
     }
 
