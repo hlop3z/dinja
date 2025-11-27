@@ -351,6 +351,122 @@ jobs:
           cache-to: type=gha,mode=max
 ```
 
+## Automated CI/CD with GitHub Actions
+
+### Overview
+
+Dinja includes two GitHub Actions workflows for automated Docker image building and publishing:
+
+1. **Manual Build** (`.github/workflows/docker-build-manual.yml`)
+2. **Release Build** (`.github/workflows/docker-release.yml`)
+
+### Manual Docker Build
+
+Trigger manually via GitHub Actions UI with custom options.
+
+**Workflow:** `Docker Build (Manual)`
+
+**Options:**
+- **Tag**: Custom image tag (default: `latest`)
+- **Push to Registry**: Whether to push to GitHub Container Registry (ghcr.io)
+
+**Features:**
+- Builds Docker image
+- Runs health check tests
+- Saves image as artifact (30-day retention)
+- Optionally pushes to ghcr.io
+
+**Usage:**
+1. Go to Actions tab in GitHub
+2. Select "Docker Build (Manual)"
+3. Click "Run workflow"
+4. Set options and run
+
+**Outputs:**
+- Workflow artifact: `docker-image-{tag}-{run_number}`
+- Download and load: `docker load -i docker-image-*.tar`
+
+### Release Docker Build
+
+Automatically triggered when a new release is published.
+
+**Workflow:** `Docker Release`
+
+**Triggers:**
+- Automatic: On release published/created
+- Manual: Via workflow_dispatch with release tag
+
+**Features:**
+- Multi-platform builds (linux/amd64, linux/arm64)
+- Semantic versioning tags (e.g., `1.0.0`, `1.0`, `1`, `latest`)
+- GitHub Container Registry publishing
+- Image artifact with SHA256 checksum (90-day retention)
+- Automatic release comment with usage instructions
+
+**Version Tags:**
+```
+ghcr.io/username/dinja:1.0.0    # Specific version
+ghcr.io/username/dinja:1.0      # Minor version
+ghcr.io/username/dinja:1        # Major version
+ghcr.io/username/dinja:latest   # Latest release
+```
+
+**Pull Published Images:**
+```bash
+# Pull specific version
+docker pull ghcr.io/username/dinja:1.0.0
+
+# Pull latest
+docker pull ghcr.io/username/dinja:latest
+
+# Run
+docker run -p 8080:8080 ghcr.io/username/dinja:1.0.0
+```
+
+### Image Artifacts
+
+Both workflows save Docker images to `.artifacts/` directory:
+
+**Local Builds:**
+```bash
+# Build locally
+./utils/docker-build.sh --tag v1.0.0
+
+# Find saved image
+ls .artifacts/
+# Output: dinja-v1.0.0-20240327-123456.tar
+
+# Load on another machine
+docker load -i .artifacts/dinja-v1.0.0-20240327-123456.tar
+```
+
+**CI/CD Artifacts:**
+1. Go to workflow run in GitHub Actions
+2. Download artifact from "Artifacts" section
+3. Extract and load:
+```bash
+unzip docker-image-*.zip
+docker load -i *.tar
+```
+
+### Setting Up GitHub Container Registry
+
+To use ghcr.io, ensure you have the correct permissions:
+
+1. **Personal Access Token** (if needed):
+   - Go to Settings → Developer settings → Personal access tokens
+   - Create token with `write:packages` scope
+
+2. **Login to ghcr.io:**
+```bash
+echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+```
+
+3. **Pull private images:**
+```bash
+docker pull ghcr.io/username/dinja:latest
+```
+
 ## Next Steps
 
 1. Add `/health` endpoint to the server

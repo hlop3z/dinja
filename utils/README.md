@@ -71,9 +71,14 @@ Build Docker image for the Dinja HTTP server using scratch base image.
 - `--name NAME` - Custom image name (default: `dinja`)
 - `--push` - Push image to registry after build
 
+**Features:**
+- Automatically saves built image to `.artifacts/` directory as a tar archive
+- Includes timestamp in filename for versioning
+- Provides instructions for loading image on other machines
+
 **Examples:**
 ```bash
-# Basic build
+# Basic build (saves to .artifacts/)
 ./utils/docker-build.sh
 
 # Build with custom tag
@@ -82,11 +87,21 @@ Build Docker image for the Dinja HTTP server using scratch base image.
 # Build without cache
 ./utils/docker-build.sh --no-cache
 
-# Build and push
+# Build and push to registry
 ./utils/docker-build.sh --push --tag v1.0.0
 
 # Build with custom name and tag
 ./utils/docker-build.sh --name myregistry.com/dinja --tag production --push
+```
+
+**Loading Saved Images:**
+After building, find your image in `.artifacts/` and load it on another machine:
+```bash
+# List available images
+ls .artifacts/
+
+# Load image
+docker load -i .artifacts/dinja-latest-20240327-123456.tar
 ```
 
 ## Notes

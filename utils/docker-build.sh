@@ -80,6 +80,30 @@ if [ $? -eq 0 ]; then
     echo -e "${GREEN}[INFO]${NC} Image size: ${SIZE}"
     echo ""
 
+    # Save image to .artifacts/ directory for internal distribution
+    echo -e "${GREEN}[INFO]${NC} Saving image to .artifacts/ directory..."
+    ARTIFACTS_DIR="${PROJECT_ROOT}/.artifacts"
+    mkdir -p "${ARTIFACTS_DIR}"
+
+    # Generate filename with timestamp and tag
+    TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+    SAFE_IMAGE_NAME=$(echo "${IMAGE_NAME}" | sed 's/[\/:]/-/g')
+    TAR_FILENAME="${SAFE_IMAGE_NAME}-${IMAGE_TAG}-${TIMESTAMP}.tar"
+    TAR_PATH="${ARTIFACTS_DIR}/${TAR_FILENAME}"
+
+    docker save "${FULL_IMAGE_NAME}" -o "${TAR_PATH}"
+    if [ $? -eq 0 ]; then
+        TAR_SIZE=$(du -h "${TAR_PATH}" | cut -f1)
+        echo -e "${GREEN}[SUCCESS]${NC} Image saved to: ${TAR_PATH}"
+        echo -e "${GREEN}[INFO]${NC} Archive size: ${TAR_SIZE}"
+        echo ""
+        echo -e "${BLUE}To load this image on another machine:${NC}"
+        echo -e "  docker load -i ${TAR_PATH}"
+        echo ""
+    else
+        echo -e "${YELLOW}[WARN]${NC} Failed to save image to .artifacts/"
+    fi
+
     # Tag as latest if not already
     if [ "${IMAGE_TAG}" != "latest" ]; then
         echo -e "${GREEN}[INFO]${NC} Tagging as latest..."

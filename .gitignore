@@ -5,6 +5,7 @@
 .legacy_code/
 .cursor/
 .ai-notes/
+.artifacts/
 
 # ---------------------------------------------------------------------------
 # Python Bytecode / Cache
