@@ -19,4 +19,4 @@ By {context('author')}
     )
 )
 
-# print(result)
+print(result)
