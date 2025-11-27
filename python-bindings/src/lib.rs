@@ -87,8 +87,9 @@ impl Renderer {
             max_cached_renderers: 4,
             resource_limits: dinja_core::models::ResourceLimits::default(),
         };
-        let service = CoreRenderService::new(config)
-            .map_err(|e| PyValueError::new_err(format!("Failed to create render service: {}", e)))?;
+        let service = CoreRenderService::new(config).map_err(|e| {
+            PyValueError::new_err(format!("Failed to create render service: {}", e))
+        })?;
         Ok(Self {
             service: Mutex::new(service),
         })
@@ -202,15 +203,15 @@ mod tests {
             static_dir.join("engine_to_string.min.js").exists(),
             "engine_to_string.min.js was not created"
         );
-        assert!(static_dir.join("core.js").exists(), "core.js was not created");
+        assert!(
+            static_dir.join("core.js").exists(),
+            "core.js was not created"
+        );
 
         static_dir
     }
 
-    fn create_test_config(
-        output: OutputFormat,
-        mdx_content: &str,
-    ) -> NamedMdxBatchInput {
+    fn create_test_config(output: OutputFormat, mdx_content: &str) -> NamedMdxBatchInput {
         let mut mdx = HashMap::new();
         mdx.insert("test.mdx".to_string(), mdx_content.to_string());
 
@@ -479,7 +480,10 @@ mod tests {
                 1 => OutputFormat::Javascript,
                 _ => OutputFormat::Schema,
             };
-            inputs.push(create_test_config(mode, &format!("## Page {}\n\nContent {}", i, i)));
+            inputs.push(create_test_config(
+                mode,
+                &format!("## Page {}\n\nContent {}", i, i),
+            ));
         }
 
         let mut success_count = 0;
@@ -497,13 +501,20 @@ mod tests {
                     let error_str = format!("{:?}", e);
                     if is_v8_isolate_error(&error_str) {
                         known_issue_count += 1;
-                        println!("  ⚠️  Batch item {}: v8 isolate error (known limitation)", i);
+                        println!(
+                            "  ⚠️  Batch item {}: v8 isolate error (known limitation)",
+                            i
+                        );
                         // Continue to next item instead of panicking
                         continue;
-                    } else if error_str.contains("engine") || error_str.contains("engine_to_string") {
+                    } else if error_str.contains("engine") || error_str.contains("engine_to_string")
+                    {
                         // Engine initialization issue - might be a test environment problem
                         known_issue_count += 1;
-                        println!("  ⚠️  Batch item {}: Engine initialization issue (test environment)", i);
+                        println!(
+                            "  ⚠️  Batch item {}: Engine initialization issue (test environment)",
+                            i
+                        );
                         println!("     Error: {}", e);
                         // Continue to next item instead of panicking
                         continue;
@@ -521,7 +532,7 @@ mod tests {
             elapsed,
             batch_size as f64 / elapsed.as_secs_f64()
         );
-        
+
         // Allow test to pass if we have some successes, even if some failed due to known issues
         if success_count == 0 && known_issue_count > 0 {
             println!("  ⚠️  All renders failed due to known issues (engine init or v8 isolate)");
@@ -575,8 +586,14 @@ mod tests {
         let reusable_rps = total_renders as f64 / elapsed_reusable.as_secs_f64();
         let speedup = stateless_rps / reusable_rps;
 
-        println!("  Stateless: {} renders in {:?} ({:.2} renders/sec)", total_renders, elapsed_stateless, stateless_rps);
-        println!("  Reusable:  {} renders in {:?} ({:.2} renders/sec)", total_renders, elapsed_reusable, reusable_rps);
+        println!(
+            "  Stateless: {} renders in {:?} ({:.2} renders/sec)",
+            total_renders, elapsed_stateless, stateless_rps
+        );
+        println!(
+            "  Reusable:  {} renders in {:?} ({:.2} renders/sec)",
+            total_renders, elapsed_reusable, reusable_rps
+        );
         println!("  Speedup:   {:.2}x faster with reusable approach", speedup);
 
         // Reusable should be faster (or at least not slower)
@@ -592,7 +609,10 @@ mod tests {
         println!("\n=== Test: Rendering with Components ===");
         let service = init_test_service();
         let mut mdx = HashMap::new();
-        mdx.insert("test.mdx".to_string(), MDX_CONTENT_WITH_COMPONENT.to_string());
+        mdx.insert(
+            "test.mdx".to_string(),
+            MDX_CONTENT_WITH_COMPONENT.to_string(),
+        );
 
         let mut components = HashMap::new();
         components.insert(
@@ -657,11 +677,15 @@ mod tests {
                         println!("     Error: {}", e);
                         // Continue to next mode instead of panicking
                         continue;
-                    } else if error_str.contains("engine") || error_str.contains("engine_to_string") {
+                    } else if error_str.contains("engine") || error_str.contains("engine_to_string")
+                    {
                         // Engine initialization issue - might be a test environment problem
                         // This can happen if static files aren't loaded correctly or timing issues
                         known_issue_count += 1;
-                        println!("  ⚠️  Mode {:?}: Engine initialization issue (test environment)", mode);
+                        println!(
+                            "  ⚠️  Mode {:?}: Engine initialization issue (test environment)",
+                            mode
+                        );
                         println!("     Error: {}", e);
                         continue;
                     } else {

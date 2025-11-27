@@ -67,43 +67,43 @@ fn markdown_options() -> Options {
 /// HTML string with Fragment wrapper removed if present, otherwise unchanged
 fn unwrap_fragment(html: &str) -> String {
     let trimmed = html.trim();
-    
+
     // Check if the HTML starts with <Fragment (case-insensitive, allowing attributes)
     let fragment_start_patterns = ["<Fragment", "<fragment"];
     let mut fragment_start: Option<usize> = None;
-    
+
     for pattern in &fragment_start_patterns {
         if let Some(pos) = trimmed.find(pattern) {
             fragment_start = Some(pos);
             break;
         }
     }
-    
+
     if let Some(start) = fragment_start {
         // Find the closing > of the opening tag (handle self-closing or with attributes)
         if let Some(tag_end) = trimmed[start..].find('>') {
             let tag_end = start + tag_end + 1;
             let content_start = tag_end;
-            
+
             // Find the closing </Fragment> tag (case-insensitive)
             let remaining = &trimmed[content_start..];
             let fragment_end_patterns = ["</Fragment>", "</fragment>"];
             let mut fragment_end: Option<usize> = None;
-            
+
             for pattern in &fragment_end_patterns {
                 if let Some(pos) = remaining.rfind(pattern) {
                     fragment_end = Some(pos);
                     break;
                 }
             }
-            
+
             if let Some(end_pos) = fragment_end {
                 // Extract just the content between the tags
                 return remaining[..end_pos].trim().to_string();
             }
         }
     }
-    
+
     // No Fragment wrapper found, return as-is
     html.to_string()
 }
