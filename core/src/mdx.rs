@@ -204,8 +204,10 @@ fn render_with_engine_pipeline(
     // HOT PATH: TSX transformation - called for every MDX file with Html/Javascript output
     let mut transform_config = TsxTransformConfig::for_engine(false);
 
-    // For schema output, collect component names to convert function references to strings
-    if matches!(context.settings.output, OutputFormat::Schema) {
+    // For schema/json output, convert component function references to strings
+    // For HTML output, keep as function references so they can be rendered
+    // For JavaScript output, keep Preact syntax with h() and Fragment
+    if matches!(context.settings.output, OutputFormat::Schema | OutputFormat::Json) {
         if let Some(components) = context.components {
             let component_names: std::collections::HashSet<String> = components
                 .iter()
@@ -227,9 +229,11 @@ fn render_with_engine_pipeline(
         .map_err(|e| {
             MdxError::TsxTransform(format!("Failed to transform TSX to JavaScript: {e}"))
         })?;
+    eprintln!("[DEBUG] TSX: {}", javascript_output.chars().take(150).collect::<String>());
 
     // HOT PATH: Component rendering - executes JavaScript and renders to HTML
     let template_output = render_template(context, &javascript_output)?;
+    eprintln!("[DEBUG] Result: {}", template_output.chars().take(150).collect::<String>());
 
     match context.settings.output {
         OutputFormat::Html => {
@@ -241,8 +245,8 @@ fn render_with_engine_pipeline(
                 MdxError::TsxTransform(format!("Failed to transform template to JavaScript: {e}"))
             })
         }
-        OutputFormat::Schema => {
-            // Render using core.js engine for schema output
+        OutputFormat::Schema | OutputFormat::Json => {
+            // Render using core.js engine for schema/json output
             render_template_to_schema(context, &javascript_output)
         }
     }

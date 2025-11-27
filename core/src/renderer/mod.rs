@@ -148,7 +148,24 @@ impl JsRenderer {
         components: Option<&HashMap<String, ComponentDefinition>>,
     ) -> AnyhowResult<String> {
         let component_bootstrap = component_bootstrap_script(components)?;
-        let wrapped_code = wrap_transformed_component(&component_bootstrap, transformed_js);
+
+        // Extract component names for variable declarations
+        let component_names: Vec<String> = components
+            .map(|comp_map| {
+                comp_map
+                    .iter()
+                    .map(|(key, comp_def)| {
+                        comp_def
+                            .name
+                            .as_ref()
+                            .cloned()
+                            .unwrap_or_else(|| key.clone())
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let wrapped_code = wrap_transformed_component(&component_bootstrap, transformed_js, &component_names);
 
         self.render_component(&wrapped_code, props)
     }
@@ -204,7 +221,24 @@ impl JsRenderer {
         components: Option<&HashMap<String, ComponentDefinition>>,
     ) -> AnyhowResult<String> {
         let component_bootstrap = component_bootstrap_script(components)?;
-        let wrapped_code = wrap_transformed_component(&component_bootstrap, transformed_js);
+
+        // Extract component names for variable declarations
+        let component_names: Vec<String> = components
+            .map(|comp_map| {
+                comp_map
+                    .iter()
+                    .map(|(key, comp_def)| {
+                        comp_def
+                            .name
+                            .as_ref()
+                            .cloned()
+                            .unwrap_or_else(|| key.clone())
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let wrapped_code = wrap_transformed_component(&component_bootstrap, transformed_js, &component_names);
 
         self.render_component_to_schema(&wrapped_code, props)
     }

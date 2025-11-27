@@ -14,7 +14,12 @@ use dinja_core::service::{RenderService, RenderServiceConfig};
 #[cfg(feature = "http")]
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    println!("🦀 Starting Rust CMS server on http://127.0.0.1:8080");
+    // Read host and port from environment variables with defaults
+    let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let bind_addr = format!("{}:{}", host, port);
+
+    println!("🦀 Starting Dinja MDX server on http://{}", bind_addr);
 
     let config = RenderServiceConfig::from_env();
     let service = RenderService::new(config)
@@ -25,7 +30,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(service.clone()))
             .service(handlers::render)
     })
-    .bind("127.0.0.1:8080")?
+    .bind(&bind_addr)?
     .run()
     .await
 }

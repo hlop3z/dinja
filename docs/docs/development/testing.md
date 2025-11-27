@@ -7,7 +7,7 @@ How to run and write tests for Dinja.
 ### All Tests
 
 ```bash
-./build.sh test
+./utils/build.sh test
 ```
 
 ### Python Tests Only

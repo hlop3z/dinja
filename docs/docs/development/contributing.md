@@ -26,7 +26,7 @@ See the [Building](building.md) guide for setting up your development environmen
 Always run tests before submitting:
 
 ```bash
-./build.sh test
+./utils/build.sh test
 ```
 
 ## Pull Request Process

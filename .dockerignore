@@ -1,0 +1,60 @@
+# Ignore build artifacts
+target/
+**/target/
+
+# Ignore Python virtual environments
+.venv/
+venv/
+**/.venv/
+**/venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Ignore Git files
+.git/
+.gitignore
+.gitattributes
+
+# Ignore IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Ignore CI/CD files
+.github/
+.gitlab-ci.yml
+
+# Ignore documentation
+*.md
+docs/
+examples/
+
+# Ignore test files
+**/tests/
+**/*_test.rs
+**/*_test.py
+
+# Ignore local development files
+.env
+.env.local
+*.log
+
+# Ignore build scripts and utilities (they're not needed in the image)
+utils/
+
+# Ignore Docker files (no need to copy them into the image)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Keep only what's needed for the build
+!core/src/
+!core/Cargo.toml
+!core/static/
+!python-bindings/Cargo.toml
+!Cargo.toml
+!Cargo.lock

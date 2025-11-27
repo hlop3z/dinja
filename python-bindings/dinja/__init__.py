@@ -18,8 +18,7 @@ _native = import_module("dinja._native")
 _NativeRenderer = _native.Renderer
 
 # Type aliases matching Rust enums
-OutputFormat = Literal["html", "javascript", "schema"]
-RenderEngine = Literal["base", "custom"]
+OutputFormat = Literal["html", "javascript", "schema", "json"]
 
 
 @dataclass

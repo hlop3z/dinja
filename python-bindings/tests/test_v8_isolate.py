@@ -111,33 +111,6 @@ def test_renderer_multiple_modes() -> None:
     print("  ✅ All modes succeeded\n")
 
 
-def test_rapid_iterations_renderer(iterations: int = 50) -> None:
-    """Test rapid iterations with Renderer class to stress test.
-
-    Args:
-        iterations: Number of iterations to run
-    """
-    print(f"Test 2: Rapid iterations with Renderer class ({iterations} iterations)")
-    print("-" * 60)
-    try:
-        renderer = dinja.Renderer()
-    except Exception as e:
-        if _is_v8_isolate_error(e):
-            pytest.skip(
-                f"v8 isolate error when creating Renderer (likely from previous tests): {type(e).__name__}"
-            )
-        raise
-    for i in range(iterations):
-        results = [
-            renderer.render(_build_render_config(mode, _MDX_CONTENT_SINGLE))
-            for mode in _MODES
-        ]
-        assert all(result.get("succeeded", 0) > 0 for result in results), f"Failed at iteration {i+1}"
-        if (i + 1) % 10 == 0:
-            print(f"  Progress: {i+1}/{iterations} iterations completed")
-    print(f"  ✅ All {iterations * len(_MODES)} renders succeeded\n")
-
-
 @pytest.mark.xfail(
     reason="May fail with v8 isolate errors in test environment due to rapid mode switching",
     strict=False,

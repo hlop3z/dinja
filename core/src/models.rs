@@ -40,36 +40,22 @@ pub enum OutputFormat {
     Html,
     /// Return JavaScript (transform template back to JS)
     Javascript,
-    /// Return JavaScript code after TSX transformation (before rendering)
+    /// Return JSON schema representation (same as Json)
     Schema,
-}
-
-/// Rendering engine selection
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum RenderEngine {
-    /// Use built-in base engine components
-    #[default]
-    Base,
-    /// Use user-provided custom components
-    Custom,
+    /// Return JSON schema representation (alias for Schema)
+    #[serde(alias = "json")]
+    Json,
 }
 
 /// Rendering settings
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct RenderSettings {
-    /// Output format (html, javascript, or schema)
+    /// Output format (html, javascript, schema, or json)
     #[serde(default)]
     pub output: OutputFormat,
     /// Enable minification
     #[serde(default = "default_minify_true")]
     pub minify: bool,
-    /// Rendering engine selection ("base" | "custom")
-    #[serde(default)]
-    pub engine: RenderEngine,
-    /// Component names to autopopulate when using the base engine
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub components: Vec<String>,
 }
 
 const fn default_minify_true() -> bool {
@@ -81,8 +67,6 @@ impl Default for RenderSettings {
         Self {
             output: OutputFormat::default(),
             minify: true,
-            engine: RenderEngine::default(),
-            components: Vec::new(),
         }
     }
 }

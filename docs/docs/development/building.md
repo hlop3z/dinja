@@ -41,7 +41,7 @@ mkdocs build  # For production
 Use the build script:
 
 ```bash
-./build.sh
+./utils/build.sh
 ```
 
 This will:

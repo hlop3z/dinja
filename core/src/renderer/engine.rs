@@ -217,52 +217,63 @@ pub(super) fn load_engine_library(
         "#,
     )?;
 
-    // Wrap h function to convert component function references to string names
+    // Wrap h function to convert component string names back to function references
     const WRAP_H_FUNCTION: &str = r#"
-        // Helper function to find component name from function reference
-        function findComponentName(componentFunc) {
-            if (typeof componentFunc !== 'function') {
-                return null;
-            }
-            
-            // Check all properties in globalThis to find which one points to this function
-            for (let key in globalThis) {
-                try {
-                    if (globalThis[key] === componentFunc) {
-                        return key;
-                    }
-                } catch (e) {
-                    // Skip properties that can't be accessed
-                    continue;
-                }
-            }
-            
-            // Fallback: try to get function name if available
-            if (componentFunc.name) {
-                return componentFunc.name;
-            }
-            
-            return null;
-        }
-        
-        // Wrap engine.h to convert function references to string names
+        // Wrap engine.h to handle component rendering
         if (typeof engine !== 'undefined' && engine.h) {
             const originalH = engine.h;
             engine.h = function(tag, props, ...children) {
-                // If tag is a function (component), convert it to a string name
+                // For HTML rendering: If tag is a function reference to a registered component,
+                // call it directly instead of using Preact's component lifecycle
                 if (typeof tag === 'function') {
-                    const componentName = findComponentName(tag);
-                    if (componentName) {
-                        tag = componentName;
-                    } else {
-                        // Fallback: use 'Component' if we can't find the name
-                        tag = 'Component';
+                    // Check if this function is a registered component
+                    let isRegisteredComponent = false;
+                    let componentName = null;
+                    if (globalThis.__registered_component_names) {
+                        for (let key in globalThis) {
+                            try {
+                                if (globalThis[key] === tag &&
+                                    globalThis.__registered_component_names.includes(key)) {
+                                    isRegisteredComponent = true;
+                                    componentName = key;
+                                    break;
+                                }
+                            } catch (e) {
+                                continue;
+                            }
+                        }
+                    }
+
+                    if (isRegisteredComponent) {
+                        // Call component directly for SSR
+                        const componentProps = props || {};
+                        if (children && children.length > 0) {
+                            componentProps.children = children.length === 1 ? children[0] : children;
+                        }
+                        return tag(componentProps);
                     }
                 }
+
+                // For Schema rendering: If tag is a string component name, look it up
+                if (typeof tag === 'string') {
+                    if (globalThis.__registered_component_names &&
+                        globalThis.__registered_component_names.includes(tag)) {
+                        const component = globalThis[tag];
+                        if (typeof component === 'function') {
+                            const componentProps = props || {};
+                            if (children && children.length > 0) {
+                                componentProps.children = children.length === 1 ? children[0] : children;
+                            }
+                            return component(componentProps);
+                        }
+                    }
+                }
+
                 // Handle Fragment/null/undefined
-                else if (typeof engine !== 'undefined' && (tag === engine.Fragment || tag === null || tag === undefined)) {
+                if (typeof engine !== 'undefined' && (tag === engine.Fragment || tag === null || tag === undefined)) {
                     tag = 'Fragment';
                 }
+
                 return originalH(tag, props || {}, ...children);
             };
         }
@@ -271,20 +282,53 @@ pub(super) fn load_engine_library(
         if (typeof h !== 'undefined' && typeof h === 'function') {
             const originalGlobalH = h;
             globalThis.h = function(tag, props, ...children) {
-                // If tag is a function (component), convert it to a string name
+                // For HTML rendering: If tag is a function reference to a registered component,
+                // call it directly instead of using Preact's component lifecycle
                 if (typeof tag === 'function') {
-                    const componentName = findComponentName(tag);
-                    if (componentName) {
-                        tag = componentName;
-                    } else {
-                        // Fallback: use 'Component' if we can't find the name
-                        tag = 'Component';
+                    let isRegisteredComponent = false;
+                    if (globalThis.__registered_component_names) {
+                        for (let key in globalThis) {
+                            try {
+                                if (globalThis[key] === tag &&
+                                    globalThis.__registered_component_names.includes(key)) {
+                                    isRegisteredComponent = true;
+                                    break;
+                                }
+                            } catch (e) {
+                                continue;
+                            }
+                        }
+                    }
+
+                    if (isRegisteredComponent) {
+                        const componentProps = props || {};
+                        if (children && children.length > 0) {
+                            componentProps.children = children.length === 1 ? children[0] : children;
+                        }
+                        return tag(componentProps);
                     }
                 }
+
+                // For Schema rendering: If tag is a string component name, look it up
+                if (typeof tag === 'string') {
+                    if (globalThis.__registered_component_names &&
+                        globalThis.__registered_component_names.includes(tag)) {
+                        const component = globalThis[tag];
+                        if (typeof component === 'function') {
+                            const componentProps = props || {};
+                            if (children && children.length > 0) {
+                                componentProps.children = children.length === 1 ? children[0] : children;
+                            }
+                            return component(componentProps);
+                        }
+                    }
+                }
+
                 // Handle Fragment/null/undefined
-                else if (typeof engine !== 'undefined' && (tag === engine.Fragment || tag === null || tag === undefined)) {
+                if (typeof engine !== 'undefined' && (tag === engine.Fragment || tag === null || tag === undefined)) {
                     tag = 'Fragment';
                 }
+
                 return originalGlobalH(tag, props || {}, ...children);
             };
         }

@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  dinja:
+    image: dinja:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dinja-server
+    ports:
+      - "8080:8080"
+    environment:
+      # Static files directory (already set in Dockerfile)
+      - STATIC_DIR=/static
+      # Server port
+      - PORT=8080
+      # Optional: Set log level
+      - RUST_LOG=info
+    restart: unless-stopped
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Resource limits (optional, adjust as needed)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 128M

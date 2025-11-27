@@ -4,7 +4,7 @@ This example demonstrates how to use the HTTP server to render MDX files
 with custom components to all three output formats: HTML, JavaScript, and Schema.
 
 Make sure the server is running first:
-    ./run.sh
+    ./utils/run.sh
     # or
     cd core && cargo run --features http
 """
@@ -246,7 +246,7 @@ Welcome to the custom components example!
                 f"✗ Connection error: Could not connect to server at {render_endpoint}"
             )
             print("\nMake sure the server is running:")
-            print("  ./run.sh")
+            print("  ./utils/run.sh")
             print("  # or")
             print("  cd core && cargo run --features http")
             break

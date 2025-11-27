@@ -15,45 +15,41 @@ use std::collections::HashMap;
 ///
 /// # Returns
 /// JavaScript code that resolves View, Component (for backwards compatibility), module.exports.default, or module.exports
-fn component_resolution_code_internal(var_name: &str, throw_on_not_found: bool) -> String {
-    let error_check = if throw_on_not_found {
-        format!(
-            r#"
-            if (!{var_name}) {{
-                throw new Error('Component not found. Expected View, Component or default export.');
-            }}"#
-        )
-    } else {
-        String::new()
-    };
-
+/// Generates JavaScript code to resolve the main View component for rendering
+/// Throws an error if component is not found.
+pub(super) fn component_resolution_code() -> String {
     format!(
         r#"
-            let {var_name} = typeof View !== 'undefined' ? View : (typeof Component !== 'undefined' ? Component : null);
-            if (!{var_name} && module && module.exports) {{
-                {var_name} = module.exports.default || module.exports;
+            let ComponentToRender = typeof View !== 'undefined' ? View : (typeof Component !== 'undefined' ? Component : null);
+            if (!ComponentToRender && module && module.exports) {{
+                ComponentToRender = module.exports.default || module.exports;
             }}
-            if (!{var_name} && exports) {{
-                {var_name} = exports.default || exports;
+            if (!ComponentToRender && exports) {{
+                ComponentToRender = exports.default || exports;
             }}
-            {error_check}
-    "#,
-        var_name = var_name,
-        error_check = error_check
+            if (!ComponentToRender) {{
+                throw new Error('Component not found. Expected View, Component or default export.');
+            }}
+    "#
     )
 }
 
-/// Generates JavaScript code to resolve a component from various export patterns
-/// Throws an error if component is not found.
-pub(super) fn component_resolution_code() -> String {
-    component_resolution_code_internal("ComponentToRender", true)
-}
-
-/// Helper function to resolve a component from various export patterns
-/// Returns JavaScript code that resolves View, Component (for backwards compatibility), module.exports.default, or module.exports
+/// Helper function to resolve a component being registered (NOT the main View)
+/// Returns JavaScript code that resolves Component, module.exports.default, or module.exports
+/// Does NOT look for View - View is the MDX content being rendered, not a component to register
 /// Does not throw an error if component is not found (caller should check).
 pub(super) fn resolve_component_code() -> String {
-    component_resolution_code_internal("resolved", false)
+    format!(
+        r#"
+            let resolved = typeof Component !== 'undefined' ? Component : null;
+            if (!resolved && module && module.exports) {{
+                resolved = module.exports.default || module.exports;
+            }}
+            if (!resolved && exports) {{
+                resolved = exports.default || exports;
+            }}
+    "#
+    )
 }
 
 /// Builds a render script wrapper with common component resolution logic
@@ -172,25 +168,33 @@ pub(super) fn schema_render_script(
 pub(super) fn wrap_transformed_component(
     component_bootstrap: &str,
     transformed_js: &str,
+    component_names: &[String],
 ) -> String {
+    // Generate variable declarations for components
+    let mut component_vars = String::new();
+    for name in component_names {
+        component_vars.push_str(&format!("        const {name} = globalThis.{name};\n"));
+    }
+
+    // Wrap component bootstrap in its own scope to prevent View from being visible during registration
+    // This avoids the hoisting issue where function View() {...} would be visible to component resolution code
+    let wrapped_bootstrap = if !component_bootstrap.trim().is_empty() {
+        format!("(function() {{\n{}\n}})();", component_bootstrap)
+    } else {
+        String::new()
+    };
+
     format!(
         r#"
         {component_bootstrap}
 
+        // Make registered components available as variables
+{component_vars}
         // Transformed component code
         {transformed_js}
-
-        // Make View available globally for rendering
-        if (typeof View !== 'undefined') {{
-            // View is already available
-        }} else if (typeof Component !== 'undefined') {{
-            // Fallback to Component for backwards compatibility
-            View = Component;
-        }} else if (typeof module !== 'undefined' && module.exports) {{
-            View = module.exports.default || module.exports;
-        }}
         "#,
-        component_bootstrap = component_bootstrap,
+        component_bootstrap = wrapped_bootstrap,
+        component_vars = component_vars,
         transformed_js = transformed_js
     )
 }
