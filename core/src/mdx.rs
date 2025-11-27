@@ -25,9 +25,46 @@ use crate::renderer::JsRenderer;
 use crate::transform::{transform_tsx_to_js_for_output, transform_tsx_to_js_with_config};
 use gray_matter::{engine::YAML, Matter};
 use markdown::{to_html_with_options, CompileOptions, Constructs, Options, ParseOptions};
+use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
+
+// =============================================================================
+// JSX Protection - Constants and Compiled Patterns
+// =============================================================================
+
+/// Maximum number of JSX placeholders allowed per document.
+/// Prevents DoS attacks from documents with excessive JSX components.
+const MAX_JSX_PLACEHOLDERS: usize = 1000;
+
+/// Maximum nesting depth for JSX components with children.
+/// Prevents stack overflow from deeply nested components.
+const MAX_JSX_NESTING_DEPTH: usize = 100;
+
+/// Compiled regex for self-closing JSX components with expression attributes.
+/// Pattern: <ComponentName attr={...} />
+/// - Component names must start with uppercase (JSX convention)
+/// - Must have at least one expression attribute (curly braces)
+/// - Must be self-closing (ends with />)
+static SELF_CLOSING_JSX_PATTERN: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"<([A-Z][a-zA-Z0-9]*)\s+[^>]*\{[^}]*\}[^>]*/\s*>")
+        .expect("Invalid self-closing JSX regex pattern")
+});
+
+/// Compiled regex for opening JSX tags with expression attributes.
+/// Pattern: <ComponentName attr={...}>
+/// Used to find JSX components with children that need protection.
+static OPENING_JSX_PATTERN: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"<([A-Z][a-zA-Z0-9]*)\s+[^>]*\{[^}]*\}[^>]*>")
+        .expect("Invalid opening JSX regex pattern")
+});
+
+/// Compiled regex for extracting component names from HTML.
+/// Used for schema extraction.
+static COMPONENT_NAME_PATTERN: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"<([A-Z][a-zA-Z0-9]*)").expect("Invalid component name regex pattern")
+});
 
 struct RenderContext<'a> {
     renderer: &'a JsRenderer,
@@ -51,6 +88,284 @@ fn markdown_options() -> Options {
             ..CompileOptions::default()
         },
     }
+}
+
+// =============================================================================
+// JSX Protection - Core Functions
+// =============================================================================
+
+/// Protects JSX components from markdown processing by replacing them with placeholders.
+///
+/// JSX components are identified as tags starting with a capital letter that contain
+/// expression attributes (curly braces). This prevents markdown from escaping the
+/// curly braces which would break the JSX syntax.
+///
+/// # Safety Limits
+/// - Maximum `MAX_JSX_PLACEHOLDERS` placeholders per document
+/// - Maximum `MAX_JSX_NESTING_DEPTH` nesting depth for components with children
+///
+/// # Arguments
+/// * `content` - The MDX content to process
+///
+/// # Returns
+/// A tuple of (processed content, placeholder map)
+fn protect_jsx_components(content: &str) -> (String, HashMap<String, String>) {
+    // Early return for empty content
+    if content.is_empty() {
+        return (String::new(), HashMap::new());
+    }
+
+    // Pre-allocate with estimated capacity
+    let estimated_placeholders = content.matches('<').count().min(MAX_JSX_PLACEHOLDERS) / 4;
+    let mut placeholders: HashMap<String, String> =
+        HashMap::with_capacity(estimated_placeholders.max(8));
+    let mut result = content.to_string();
+    let mut counter: usize = 0;
+
+    // Phase 1: Protect self-closing JSX components
+    // These are the most common and safest to handle
+    let matches: Vec<_> = SELF_CLOSING_JSX_PATTERN.find_iter(content).collect();
+
+    for mat in matches.into_iter().rev() {
+        // Check placeholder limit
+        if counter >= MAX_JSX_PLACEHOLDERS {
+            eprintln!(
+                "Warning: JSX placeholder limit ({}) reached, some JSX may not be protected",
+                MAX_JSX_PLACEHOLDERS
+            );
+            break;
+        }
+
+        let jsx = mat.as_str();
+        let placeholder = format!("<!--JSX:{}-->", counter);
+
+        // Use positional replacement to avoid issues with duplicate JSX
+        let start = mat.start();
+        let end = mat.end();
+
+        // Adjust positions based on previous replacements
+        // Since we iterate in reverse, positions should still be valid
+        if start < result.len() && end <= result.len() {
+            // Verify the content at this position still matches
+            if result.get(start..end).map(|s| s == jsx).unwrap_or(false) {
+                result.replace_range(start..end, &placeholder);
+                placeholders.insert(placeholder, jsx.to_string());
+                counter += 1;
+            }
+        }
+    }
+
+    // Phase 2: Protect JSX components with children
+    // This requires finding matching closing tags
+    protect_jsx_with_children(&mut result, &mut placeholders, &mut counter);
+
+    (result, placeholders)
+}
+
+/// Protects JSX components that have children (non-self-closing).
+/// Uses a more careful approach to match opening and closing tags.
+fn protect_jsx_with_children(
+    content: &mut String,
+    placeholders: &mut HashMap<String, String>,
+    counter: &mut usize,
+) {
+    let mut depth = 0;
+    let mut iterations = 0;
+    let max_iterations = MAX_JSX_PLACEHOLDERS;
+
+    // Keep processing until no more matches or limits reached
+    loop {
+        iterations += 1;
+        if iterations > max_iterations || *counter >= MAX_JSX_PLACEHOLDERS {
+            break;
+        }
+
+        // Find the next opening tag with expression attributes
+        let content_snapshot = content.clone();
+        let capture = match OPENING_JSX_PATTERN.captures(&content_snapshot) {
+            Some(cap) => cap,
+            None => break,
+        };
+
+        let tag_name = match capture.get(1) {
+            Some(m) => m.as_str(),
+            None => break,
+        };
+
+        let opening_tag = match capture.get(0) {
+            Some(m) => m.as_str(),
+            None => break,
+        };
+
+        // Find positions
+        let open_pos = match content.find(opening_tag) {
+            Some(pos) => pos,
+            None => break,
+        };
+
+        // Find matching closing tag with proper nesting
+        let closing_tag = format!("</{}>", tag_name);
+        let search_start = open_pos + opening_tag.len();
+
+        if let Some(close_pos) =
+            find_matching_close_tag(content, search_start, tag_name, &closing_tag, &mut depth)
+        {
+            // Check nesting depth limit
+            if depth > MAX_JSX_NESTING_DEPTH {
+                eprintln!(
+                    "Warning: JSX nesting depth ({}) exceeded limit ({})",
+                    depth, MAX_JSX_NESTING_DEPTH
+                );
+                break;
+            }
+
+            let full_end = close_pos + closing_tag.len();
+
+            // Validate bounds
+            if full_end > content.len() {
+                break;
+            }
+
+            let full_jsx = content[open_pos..full_end].to_string();
+            let placeholder = format!("<!--JSX:{}-->", counter);
+
+            // Replace in content
+            content.replace_range(open_pos..full_end, &placeholder);
+            placeholders.insert(placeholder, full_jsx);
+            *counter += 1;
+        } else {
+            // No matching close tag found - this JSX is malformed
+            // Skip this tag and continue (don't protect malformed JSX)
+            break;
+        }
+    }
+}
+
+/// Finds the matching closing tag, accounting for nested tags of the same type.
+///
+/// # Arguments
+/// * `content` - The content to search in
+/// * `start` - Position to start searching from (after opening tag)
+/// * `tag_name` - The tag name to match
+/// * `closing_tag` - The full closing tag string (e.g., "</Component>")
+/// * `depth` - Tracks current nesting depth for limit checking
+///
+/// # Returns
+/// Position of the matching closing tag, or None if not found
+fn find_matching_close_tag(
+    content: &str,
+    start: usize,
+    tag_name: &str,
+    closing_tag: &str,
+    depth: &mut usize,
+) -> Option<usize> {
+    let search_region = &content[start..];
+
+    // Build pattern for nested opening tags of same type
+    let nested_open_pattern = format!("<{}", tag_name);
+
+    let mut nesting = 1;
+    let mut pos = 0;
+
+    while nesting > 0 && pos < search_region.len() {
+        // Find next occurrence of either opening or closing tag
+        let next_open = search_region[pos..].find(&nested_open_pattern);
+        let next_close = search_region[pos..].find(closing_tag);
+
+        match (next_open, next_close) {
+            (Some(open_offset), Some(close_offset)) => {
+                if open_offset < close_offset {
+                    // Found nested opening tag first
+                    nesting += 1;
+                    *depth = (*depth).max(nesting);
+                    pos += open_offset + nested_open_pattern.len();
+                } else {
+                    // Found closing tag first
+                    nesting -= 1;
+                    if nesting == 0 {
+                        return Some(start + pos + close_offset);
+                    }
+                    pos += close_offset + closing_tag.len();
+                }
+            }
+            (None, Some(close_offset)) => {
+                // Only closing tag found
+                nesting -= 1;
+                if nesting == 0 {
+                    return Some(start + pos + close_offset);
+                }
+                pos += close_offset + closing_tag.len();
+            }
+            (Some(open_offset), None) => {
+                // Only opening tag found - unbalanced
+                nesting += 1;
+                *depth = (*depth).max(nesting);
+                pos += open_offset + nested_open_pattern.len();
+            }
+            (None, None) => {
+                // Neither found - unbalanced
+                break;
+            }
+        }
+
+        // Safety limit on nesting
+        if nesting > MAX_JSX_NESTING_DEPTH {
+            return None;
+        }
+    }
+
+    None
+}
+
+/// Restores JSX components from placeholders after markdown processing.
+///
+/// # Arguments
+/// * `content` - The HTML content with placeholders
+/// * `placeholders` - Map of placeholder -> original JSX
+///
+/// # Returns
+/// Content with all placeholders replaced with original JSX.
+/// If any placeholders remain unreplaced, a warning is logged.
+fn restore_jsx_components(content: &str, placeholders: &HashMap<String, String>) -> String {
+    if placeholders.is_empty() {
+        return content.to_string();
+    }
+
+    let mut result = content.to_string();
+    let mut restored_count = 0;
+
+    // Sort placeholders by index to ensure consistent restoration order
+    let mut placeholder_vec: Vec<_> = placeholders.iter().collect();
+    placeholder_vec.sort_by_key(|(k, _)| {
+        // Extract number from <!--JSX:N-->
+        k.strip_prefix("<!--JSX:")
+            .and_then(|s| s.strip_suffix("-->"))
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0)
+    });
+
+    for (placeholder, jsx) in placeholder_vec {
+        if result.contains(placeholder.as_str()) {
+            result = result.replace(placeholder.as_str(), jsx);
+            restored_count += 1;
+        }
+    }
+
+    // Validation: check if all placeholders were restored
+    if restored_count != placeholders.len() {
+        eprintln!(
+            "Warning: JSX restoration incomplete - {} of {} placeholders restored",
+            restored_count,
+            placeholders.len()
+        );
+    }
+
+    // Validate no placeholders remain in output
+    if result.contains("<!--JSX:") {
+        eprintln!("Warning: Unreplaced JSX placeholders found in output");
+    }
+
+    result
 }
 
 /// Unwraps the first Fragment wrapper from HTML output if present.
@@ -110,8 +425,15 @@ fn unwrap_fragment(html: &str) -> String {
 }
 
 fn render_markdown(content: &str) -> Result<String, MdxError> {
+    // Protect JSX components with expression attributes from markdown processing
+    let (protected_content, placeholders) = protect_jsx_components(content);
+
     let options = markdown_options();
-    to_html_with_options(content, &options).map_err(|e| MdxError::MarkdownRender(e.to_string()))
+    let html = to_html_with_options(&protected_content, &options)
+        .map_err(|e| MdxError::MarkdownRender(e.to_string()))?;
+
+    // Restore JSX components after markdown processing
+    Ok(restore_jsx_components(&html, &placeholders))
 }
 
 /// Helper function to log render errors with context
@@ -393,9 +715,8 @@ fn render_with_engine_pipeline(
             // Start by extracting component names from the HTML content (JSX tags starting with capital letters)
             let mut component_names: HashSet<String> = HashSet::new();
 
-            // Extract from HTML content
-            let re = Regex::new(r"<([A-Z][a-zA-Z0-9]*)").unwrap();
-            for cap in re.captures_iter(html_output) {
+            // Extract from HTML content using pre-compiled pattern
+            for cap in COMPONENT_NAME_PATTERN.captures_iter(html_output) {
                 if let Some(name) = cap.get(1) {
                     component_names.insert(name.as_str().to_string());
                 }
@@ -436,8 +757,8 @@ fn render_with_engine_pipeline(
                 // Extract component names from HTML content (JSX tags starting with capital letters)
                 let mut component_names: HashSet<String> = HashSet::new();
 
-                let re = Regex::new(r"<([A-Z][a-zA-Z0-9]*)").unwrap();
-                for cap in re.captures_iter(html_output) {
+                // Extract from HTML content using pre-compiled pattern
+                for cap in COMPONENT_NAME_PATTERN.captures_iter(html_output) {
                     if let Some(name) = cap.get(1) {
                         component_names.insert(name.as_str().to_string());
                     }
@@ -525,4 +846,143 @@ fn render_template_to_schema(
             log_render_error(&e, javascript_output, "Schema");
             MdxError::TsxTransform(format!("Failed to render component to schema: {:#}", e))
         })
+}
+
+// =============================================================================
+// Unit Tests for JSX Protection
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_protect_jsx_empty_content() {
+        let (result, placeholders) = protect_jsx_components("");
+        assert!(result.is_empty());
+        assert!(placeholders.is_empty());
+    }
+
+    #[test]
+    fn test_protect_jsx_no_jsx() {
+        let content = "# Hello World\n\nThis is plain markdown.";
+        let (result, placeholders) = protect_jsx_components(content);
+        assert_eq!(result, content);
+        assert!(placeholders.is_empty());
+    }
+
+    #[test]
+    fn test_protect_jsx_without_expression_attributes() {
+        // JSX without expression attributes should NOT be protected
+        let content = r#"<Card title="Test">Content</Card>"#;
+        let (result, placeholders) = protect_jsx_components(content);
+        assert_eq!(result, content);
+        assert!(placeholders.is_empty());
+    }
+
+    #[test]
+    fn test_protect_self_closing_jsx_with_expression() {
+        let content = r#"<Hero title={context("title")} />"#;
+        let (result, placeholders) = protect_jsx_components(content);
+
+        assert!(result.contains("<!--JSX:"));
+        assert_eq!(placeholders.len(), 1);
+        assert!(placeholders.values().any(|v| v.contains("Hero")));
+    }
+
+    #[test]
+    fn test_protect_multiple_jsx_components() {
+        let content = r#"
+<Hero title={context("title")} />
+<Card data={props.data} />
+"#;
+        let (result, placeholders) = protect_jsx_components(content);
+
+        assert_eq!(placeholders.len(), 2);
+        assert!(!result.contains("<Hero"));
+        assert!(!result.contains("<Card"));
+    }
+
+    #[test]
+    fn test_protect_jsx_with_children_and_expression() {
+        let content = r#"<Container theme={props.theme}>Child content</Container>"#;
+        let (result, placeholders) = protect_jsx_components(content);
+
+        assert!(result.contains("<!--JSX:"));
+        assert_eq!(placeholders.len(), 1);
+    }
+
+    #[test]
+    fn test_restore_jsx_components() {
+        let original = r#"<Hero title={context("title")} />"#;
+        let (protected, placeholders) = protect_jsx_components(original);
+
+        let restored = restore_jsx_components(&protected, &placeholders);
+        assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn test_restore_multiple_jsx_components() {
+        let content = r#"
+# Title
+<Hero title={context("title")} />
+Some text
+<Card data={props.data} />
+"#;
+        let (protected, placeholders) = protect_jsx_components(content);
+        let restored = restore_jsx_components(&protected, &placeholders);
+
+        assert!(restored.contains("<Hero"));
+        assert!(restored.contains("<Card"));
+        assert!(restored.contains("context(\"title\")"));
+    }
+
+    #[test]
+    fn test_protect_jsx_preserves_surrounding_content() {
+        let content = "# Title\n\n<Hero title={data} />\n\nMore content";
+        let (result, placeholders) = protect_jsx_components(content);
+
+        assert!(result.contains("# Title"));
+        assert!(result.contains("More content"));
+        assert_eq!(placeholders.len(), 1);
+
+        let restored = restore_jsx_components(&result, &placeholders);
+        assert_eq!(restored, content);
+    }
+
+    #[test]
+    fn test_find_matching_close_tag_simple() {
+        let content = "<div>content</div>";
+        let mut depth = 0;
+        let result = find_matching_close_tag(content, 5, "div", "</div>", &mut depth);
+        assert_eq!(result, Some(12));
+    }
+
+    #[test]
+    fn test_find_matching_close_tag_nested() {
+        let content = "<div><div>inner</div>outer</div>";
+        let mut depth = 0;
+        let result = find_matching_close_tag(content, 5, "div", "</div>", &mut depth);
+        // Should find the outer closing tag, not the inner one
+        assert_eq!(result, Some(26));
+        assert!(depth >= 2); // Detected nesting
+    }
+
+    #[test]
+    fn test_protect_jsx_lowercase_tags_ignored() {
+        // Lowercase tags are HTML, not JSX components
+        let content = r#"<div class={style}>Content</div>"#;
+        let (_result, placeholders) = protect_jsx_components(content);
+        // Lowercase tags with expressions might still get caught, but the pattern
+        // specifically looks for uppercase component names
+        assert!(placeholders.is_empty() || !placeholders.values().any(|v| v.starts_with("<div")));
+    }
+
+    #[test]
+    fn test_static_patterns_compile() {
+        // Verify all static patterns compile successfully
+        assert!(SELF_CLOSING_JSX_PATTERN.is_match("<Component prop={value} />"));
+        assert!(OPENING_JSX_PATTERN.is_match("<Component prop={value}>"));
+        assert!(COMPONENT_NAME_PATTERN.is_match("<MyComponent"));
+    }
 }

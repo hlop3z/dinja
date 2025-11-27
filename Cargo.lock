@@ -690,6 +690,7 @@ dependencies = [
  "deno_core",
  "gray_matter",
  "markdown",
+ "once_cell",
  "oxc_allocator",
  "oxc_codegen",
  "oxc_parser",

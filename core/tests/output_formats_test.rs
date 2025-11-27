@@ -635,3 +635,111 @@ fn test_output_format_consistency() {
         println!("{}", result.output.as_ref().unwrap());
     }
 }
+
+use dinja_core::models::ComponentDefinition;
+
+#[test]
+fn test_jsx_component_with_expression_attributes() {
+    // This test verifies that JSX components with expression attributes
+    // (like `title={context("title")}`) are properly parsed and rendered,
+    // not escaped as HTML entities.
+    let service = create_test_service();
+
+    let mut mdx_files = HashMap::new();
+    let mdx_content = r#"---
+title: Home
+subtitle: Welcome to our site
+author: John Doe
+---
+
+# {context('title')}
+
+Welcome to our amazing website! This is a simple demo of MDX rendering.
+
+## Features
+
+<Hero title={context("title")} subtitle={context("subtitle")} />
+"#;
+    mdx_files.insert("jsx_expression.mdx".to_string(), mdx_content.to_string());
+
+    // Provide a Hero component definition using JSX syntax
+    let mut components = HashMap::new();
+    components.insert(
+        "Hero".to_string(),
+        ComponentDefinition {
+            name: Some("Hero".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ title, subtitle }) {
+                return <div class="hero"><h2>{title}</h2><p>{subtitle}</p></div>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service
+        .render_batch(&input)
+        .expect("Failed to render batch");
+
+    assert!(outcome.is_all_success());
+
+    let file_outcome = outcome
+        .files
+        .get("jsx_expression.mdx")
+        .expect("File not found");
+    let result = file_outcome
+        .result
+        .as_ref()
+        .expect("Result should be present");
+
+    let html = result.output.as_ref().expect("HTML should be present");
+    println!("HTML output:\n{}", html);
+
+    // The JSX component should NOT be escaped (no &lt; or &gt;)
+    assert!(
+        !html.contains("&lt;Hero"),
+        "JSX component should not be escaped: {}",
+        html
+    );
+    assert!(
+        !html.contains("&gt;"),
+        "JSX closing should not be escaped: {}",
+        html
+    );
+
+    // The frontmatter context() calls should be resolved
+    assert!(
+        html.contains("Home"),
+        "Frontmatter title should be resolved: {}",
+        html
+    );
+
+    // The Hero component should be rendered with the correct props
+    // It should produce <div class="hero"><h2>Home</h2><p>Welcome to our site</p></div>
+    assert!(
+        html.contains(r#"<div class="hero">"#),
+        "Hero component should be rendered with hero class: {}",
+        html
+    );
+    assert!(
+        html.contains("<h2>Home</h2>"),
+        "Hero component should render title from frontmatter: {}",
+        html
+    );
+    assert!(
+        html.contains("<p>Welcome to our site</p>"),
+        "Hero component should render subtitle from frontmatter: {}",
+        html
+    );
+}

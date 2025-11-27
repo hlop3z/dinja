@@ -13,14 +13,17 @@ This directory contains automated workflows for building, testing, and publishin
 **Purpose:** Build Docker images on-demand with custom options
 
 **Inputs:**
+
 - `tag` (required): Docker image tag (default: `latest`)
 - `push_to_registry` (boolean): Push to GitHub Container Registry
 
 **Outputs:**
+
 - Docker image artifact (30-day retention)
 - Optional push to `ghcr.io/owner/repo:tag`
 
 **Usage:**
+
 1. Navigate to Actions tab
 2. Select "Docker Build (Manual)"
 3. Click "Run workflow"
@@ -36,12 +39,14 @@ This directory contains automated workflows for building, testing, and publishin
 **File:** `docker-release.yml`
 
 **Trigger:**
+
 - Automatic: When a GitHub release is published/created
 - Manual: Via workflow_dispatch with release tag
 
 **Purpose:** Automatically build and publish Docker images for releases
 
 **Features:**
+
 - Multi-platform builds (linux/amd64, linux/arm64)
 - Semantic version tagging (e.g., `1.0.0`, `1.0`, `1`, `latest`)
 - Automatic publishing to GitHub Container Registry
@@ -49,12 +54,14 @@ This directory contains automated workflows for building, testing, and publishin
 - Automated release comment with usage instructions
 
 **Version Tags Generated:**
+
 - `ghcr.io/owner/repo:1.0.0` (exact version)
 - `ghcr.io/owner/repo:1.0` (minor version)
 - `ghcr.io/owner/repo:1` (major version)
 - `ghcr.io/owner/repo:latest` (always points to latest release)
 
 **Outputs:**
+
 - Published images to ghcr.io
 - Docker image tarball artifact with checksum
 - Automated comment on release with pull/run instructions
@@ -84,6 +91,7 @@ All Docker workflows save images to the `.artifacts/` directory and upload them 
 ### Local Builds
 
 When using `./utils/docker-build.sh`:
+
 ```bash
 # Images are saved to:
 .artifacts/dinja-{tag}-{timestamp}.tar
@@ -92,10 +100,12 @@ When using `./utils/docker-build.sh`:
 ### CI/CD Artifacts
 
 Workflow artifacts can be downloaded from:
+
 1. Actions tab → Select workflow run
 2. Artifacts section at bottom
 3. Download zip file
 4. Extract and load:
+
 ```bash
 unzip docker-image-*.zip
 docker load -i *.tar
@@ -104,6 +114,7 @@ docker load -i *.tar
 ## Permissions
 
 Workflows require the following permissions:
+
 - `contents: read` - Read repository content
 - `packages: write` - Publish to GitHub Container Registry
 
