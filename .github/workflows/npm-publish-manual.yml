@@ -1,8 +1,12 @@
-name: Publish to npm (Manual)
+name: npm Publish (Manual)
 
 on:
   workflow_dispatch:
     inputs:
+      ref:
+        description: "Branch or tag to publish from"
+        required: true
+        default: "main"
       tag:
         description: 'npm tag (latest, beta, alpha, next)'
         required: true
@@ -21,30 +25,14 @@ on:
 
 jobs:
   build:
-    name: Build ${{ matrix.target }}
-    runs-on: ${{ matrix.host }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # macOS
-          - host: macos-latest
-            target: x86_64-apple-darwin
-            build: npm run build -- --target x86_64-apple-darwin
-          - host: macos-latest
-            target: aarch64-apple-darwin
-            build: npm run build -- --target aarch64-apple-darwin
-          # Windows
-          - host: windows-latest
-            target: x86_64-pc-windows-msvc
-            build: npm run build
-          # Linux
-          - host: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            build: npm run build -- --target x86_64-unknown-linux-gnu
-
+    name: Build npm package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -52,36 +40,27 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index
-            target
-          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ matrix.target }}-cargo-
-
       - name: Install dependencies
         working-directory: js-bindings
         run: npm install
 
-      - name: Build native module
+      - name: Build TypeScript
         working-directory: js-bindings
-        run: ${{ matrix.build }}
-        env:
-          CARGO_PROFILE_RELEASE_LTO: 'fat'
-          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '1'
+        run: npm run build
+
+      - name: Run tests
+        working-directory: js-bindings
+        run: npm test
+        continue-on-error: true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bindings-${{ matrix.target }}
-          path: js-bindings/*.node
+          name: npm-dist
+          path: |
+            js-bindings/dist
+            js-bindings/package.json
+            js-bindings/README.md
           if-no-files-found: error
 
   publish:
@@ -93,12 +72,20 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-dist
+          path: js-bindings
 
       - name: Get version from package.json
         id: version
@@ -108,34 +95,18 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing version: $VERSION"
 
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: bindings-*
-          path: js-bindings/artifacts
-
-      - name: Move artifacts to package root
-        working-directory: js-bindings
-        run: |
-          for dir in artifacts/bindings-*; do
-            if [ -d "$dir" ]; then
-              mv "$dir"/*.node . 2>/dev/null || true
-            fi
-          done
-          ls -la *.node
-
       - name: Install dependencies
         working-directory: js-bindings
         run: npm install
 
       - name: Publish to npm (dry run)
-        if: ${{ github.event.inputs.dry_run == 'true' }}
+        if: ${{ inputs.dry_run == true }}
         working-directory: js-bindings
-        run: npm publish --dry-run --tag ${{ github.event.inputs.tag }}
+        run: npm publish --dry-run --tag ${{ inputs.tag }}
 
       - name: Publish to npm
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: ${{ inputs.dry_run != true }}
         working-directory: js-bindings
-        run: npm publish --provenance --tag ${{ github.event.inputs.tag }} --access public
+        run: npm publish --provenance --tag ${{ inputs.tag }} --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

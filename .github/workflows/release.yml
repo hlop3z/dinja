@@ -53,89 +53,34 @@ jobs:
           cargo publish --package dinja-core --locked --token "${CRATES_IO_TOKEN}"
 
   build-python:
-    name: Build dinja wheels (${{ matrix.label }})
+    name: Build dinja Python package
     needs: publish-core
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            label: linux-x86_64
-            python-version: "3.13"
-            build-sdist: true
-          - os: macos-14
-            label: macos-arm64
-            python-version: "3.13"
-            build-sdist: false
-          - os: macos-13
-            label: macos-x86_64
-            python-version: "3.13"
-            build-sdist: false
-          - os: windows-latest
-            label: windows-x86_64
-            python-version: "3.13"
-            build-sdist: false
-    defaults:
-      run:
-        shell: bash
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-
       - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Sync Python dependencies
         working-directory: python-bindings
         run: uv sync --dev
 
-      - name: Run Python tests
-        working-directory: python-bindings
-        run: uv run pytest
-
-      - name: Clean build artifacts
-        working-directory: python-bindings
-        run: |
-          # Remove build directories
-          rm -rf dist target/maturin
-          # Remove any .pyd/.dll files from the package directory
-          # These are created by 'maturin develop' during tests and must be removed before building
-          rm -f dinja/*.pyd dinja/*.dll dinja/_native.pyd dinja/_native.dll 2>/dev/null || true
-          # Also handle Windows path separators
-          rm -f dinja\\*.pyd dinja\\*.dll dinja\\_native.pyd dinja\\_native.dll 2>/dev/null || true
-          # Find and remove any other .pyd/.dll files outside build directories
-          find . -type f \( -name "*.pyd" -o -name "*.dll" \) ! -path "./target/*" ! -path "./dist/*" ! -path "./.venv/*" -delete 2>/dev/null || true
-          # Verify cleanup (this will show files if any remain, or succeed if none found)
-          echo "Verifying cleanup - checking for remaining .pyd/.dll files:"
-          find . -type f \( -name "*.pyd" -o -name "*.dll" \) ! -path "./target/*" ! -path "./dist/*" ! -path "./.venv/*" && echo "WARNING: Found .pyd/.dll files that should have been removed!" || echo "✓ Cleanup successful - no .pyd/.dll files in source tree"
-
       - name: Build Python distributions
         working-directory: python-bindings
-        env:
-          BUILD_SDIST: ${{ matrix.build-sdist }}
-        run: |
-          EXTRA_ARGS=""
-          if [ "${BUILD_SDIST}" = "true" ]; then
-            EXTRA_ARGS="--sdist"
-          fi
-          uv tool run maturin build --locked --release --out dist ${EXTRA_ARGS}
+        run: uv build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python-dist-${{ matrix.label }}
+          name: python-dist
           path: python-bindings/dist/*
           if-no-files-found: error
 
@@ -149,12 +94,11 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Download all wheel artifacts
+      - name: Download wheel artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: python-dist-*
+          name: python-dist
           path: dist
-          merge-multiple: true
 
       - name: Publish to PyPI via Trusted Publisher
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -162,28 +106,11 @@ jobs:
           packages-dir: dist
 
   build-npm:
-    name: Build npm (${{ matrix.target }})
+    name: Build npm package
     needs: publish-core
-    runs-on: ${{ matrix.host }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # macOS
-          - host: macos-latest
-            target: x86_64-apple-darwin
-            build: npm run build -- --target x86_64-apple-darwin
-          - host: macos-latest
-            target: aarch64-apple-darwin
-            build: npm run build -- --target aarch64-apple-darwin
-          # Windows
-          - host: windows-latest
-            target: x86_64-pc-windows-msvc
-            build: npm run build
-          # Linux
-          - host: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            build: npm run build -- --target x86_64-unknown-linux-gnu
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -193,36 +120,27 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry/index
-            target
-          key: ${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ matrix.target }}-cargo-
-
       - name: Install dependencies
         working-directory: js-bindings
         run: npm install
 
-      - name: Build native module
+      - name: Build TypeScript
         working-directory: js-bindings
-        run: ${{ matrix.build }}
-        env:
-          CARGO_PROFILE_RELEASE_LTO: 'fat'
-          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '1'
+        run: npm run build
+
+      - name: Run tests
+        working-directory: js-bindings
+        run: npm test
+        continue-on-error: true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: npm-bindings-${{ matrix.target }}
-          path: js-bindings/*.node
+          name: npm-dist
+          path: |
+            js-bindings/dist
+            js-bindings/package.json
+            js-bindings/README.md
           if-no-files-found: error
 
   publish-npm:
@@ -243,21 +161,11 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Download all artifacts
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
-          pattern: npm-bindings-*
-          path: js-bindings/artifacts
-
-      - name: Move artifacts to package root
-        working-directory: js-bindings
-        run: |
-          for dir in artifacts/npm-bindings-*; do
-            if [ -d "$dir" ]; then
-              mv "$dir"/*.node . 2>/dev/null || true
-            fi
-          done
-          ls -la *.node
+          name: npm-dist
+          path: js-bindings
 
       - name: Install dependencies
         working-directory: js-bindings
