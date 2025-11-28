@@ -6,6 +6,7 @@ pub(super) mod script_tags {
     pub const CLEANUP_RUNTIME: &str = "<cleanup_runtime>";
     pub const SETUP: &str = "<setup>";
     pub const RENDER: &str = "<render>";
+    pub const HELPERS: &str = "<helpers>";
     pub const ENGINE: &str = "<engine>";
     pub const CHECK_ENGINE: &str = "<check_engine>";
     pub const WRAP_H_FUNCTION: &str = "<wrap_h_function>";
@@ -17,6 +18,7 @@ pub(super) mod script_tags {
 
 /// Static JavaScript file names
 pub(super) mod static_files {
+    pub const HELPERS_JS: &str = "helpers.js";
     pub const ENGINE_MIN_JS: &str = "engine.min.js";
     pub const ENGINE_TO_STRING_MIN_JS: &str = "engine_to_string.min.js";
     pub const CORE_JS: &str = "core.js";

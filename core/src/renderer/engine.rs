@@ -110,54 +110,7 @@ pub(super) fn setup_globals(runtime: &mut JsRuntime) -> Result<(), MdxError> {
             };
         }
 
-        // Object spread helper for ES5 compatibility (used by Oxc transformer)
-        if (typeof globalThis._objectSpread === 'undefined') {
-            globalThis._objectSpread = function(target) {
-                for (var i = 1; i < arguments.length; i++) {
-                    var source = arguments[i];
-                    if (source != null) {
-                        for (var key in source) {
-                            if (Object.prototype.hasOwnProperty.call(source, key)) {
-                                target[key] = source[key];
-                            }
-                        }
-                    }
-                }
-                return target;
-            };
-        }
-
-        // Decorator helper for legacy TypeScript decorators (used by Oxc transformer)
-        // Source: tslib __decorate helper
-        if (typeof globalThis._decorate === 'undefined') {
-            globalThis._decorate = function(decorators, target, key, desc) {
-                var c = arguments.length;
-                var r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc;
-                var d;
-                if (typeof Reflect === "object" && typeof Reflect.decorate === "function") {
-                    r = Reflect.decorate(decorators, target, key, desc);
-                } else {
-                    for (var i = decorators.length - 1; i >= 0; i--) {
-                        if (d = decorators[i]) {
-                            r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-                        }
-                    }
-                }
-                return c > 3 && r && Object.defineProperty(target, key, r), r;
-            };
-        }
-
-        // Metadata helper for TypeScript decorator metadata (used by Oxc transformer)
-        // Source: tslib __metadata helper
-        if (typeof globalThis._decorateMetadata === 'undefined') {
-            globalThis._decorateMetadata = function(metadataKey, metadataValue) {
-                if (typeof Reflect === "object" && typeof Reflect.metadata === "function") {
-                    return Reflect.metadata(metadataKey, metadataValue);
-                }
-                // Return a no-op decorator if Reflect.metadata is not available
-                return function() {};
-            };
-        }
+        // Note: Object spread, decorator, and metadata helpers are loaded from helpers.js
     "#;
 
     runtime
@@ -425,12 +378,23 @@ pub(super) fn load_core_engine_library(
     Ok(())
 }
 
+/// Loads runtime helpers (decorators, object spread, etc.)
+pub(super) fn load_helpers(runtime: &mut JsRuntime, static_path: &Path) -> Result<(), MdxError> {
+    load_js_file(
+        runtime,
+        static_path,
+        static_files::HELPERS_JS,
+        script_tags::HELPERS,
+    )
+    .map_err(|e| MdxError::TsxTransform(format!("Failed to load helpers: {e:?}")))?;
+    Ok(())
+}
+
 /// Loads static JavaScript files from the static directory into the engine context
 ///
 /// # Arguments
 /// * `runtime` - Mutable reference to the JsRuntime
 /// * `static_dir` - Path to the directory containing static JavaScript files
-/// * `engine_code` - Optional custom engine code to inject
 pub(super) fn load_static_files_internal(
     runtime: &mut JsRuntime,
     static_dir: impl AsRef<Path>,
@@ -439,6 +403,9 @@ pub(super) fn load_static_files_internal(
 
     // Set up global objects that might be needed by the JS libraries
     setup_globals(runtime)?;
+
+    // Load runtime helpers (decorators, object spread, etc.)
+    load_helpers(runtime, static_path).map_err(anyhow::Error::from)?;
 
     // Load engine libraries (preact, used for HTML/JavaScript rendering)
     load_engine_library(runtime, static_path).map_err(anyhow::Error::from)?;
