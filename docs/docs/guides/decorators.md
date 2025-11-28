@@ -1,8 +1,122 @@
 # TypeScript Decorators
 
-Dinja supports **TypeScript legacy decorators** (`experimentalDecorators`) which are used by most popular frameworks including Angular, NestJS, TypeORM, and MobX.
+Dinja supports **TypeScript legacy decorators** (`experimentalDecorators`) for use within MDX components.
 
-## Supported Decorator Types
+## Using Decorators in Components
+
+Decorators can be used on **classes and class members** inside your components. They are useful for creating reusable utilities with cross-cutting concerns like logging, validation, or transformation.
+
+### Class Decorators
+
+```tsx
+function logged(target: any) {
+    console.log('Class created:', target.name);
+    return target;
+}
+
+@logged
+class Utils {
+    format(value: string) { return value.toUpperCase(); }
+}
+
+export default function Component(props: { text: string }) {
+    const u = new Utils();
+    return <div>{u.format(props.text)}</div>;
+}
+```
+
+### Method Decorators
+
+Method decorators can wrap or modify class methods:
+
+```tsx
+function uppercase(target: any, key: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(value: string) {
+        return original.call(this, value).toUpperCase();
+    };
+    return descriptor;
+}
+
+class Formatter {
+    @uppercase
+    format(value: string) { return value; }
+}
+
+export default function Component(props: { text: string }) {
+    const f = new Formatter();
+    return <div>{f.format(props.text)}</div>;  // "hello" → "HELLO"
+}
+```
+
+### Static Method Decorators
+
+```tsx
+function memoize(target: any, key: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    const cache = new Map();
+    descriptor.value = function(...args: any[]) {
+        const cacheKey = JSON.stringify(args);
+        if (!cache.has(cacheKey)) {
+            cache.set(cacheKey, original.apply(this, args));
+        }
+        return cache.get(cacheKey);
+    };
+    return descriptor;
+}
+
+class Calculator {
+    @memoize
+    static fibonacci(n: number): number {
+        if (n <= 1) return n;
+        return Calculator.fibonacci(n - 1) + Calculator.fibonacci(n - 2);
+    }
+}
+
+export default function Component(props: { n: number }) {
+    return <div>Fibonacci({props.n}) = {Calculator.fibonacci(props.n)}</div>;
+}
+```
+
+## Unsupported Patterns
+
+### ❌ Decorators on Standalone Functions
+
+Decorators on standalone functions are **not valid TypeScript/JavaScript syntax**:
+
+```tsx
+// ❌ This will NOT work - invalid syntax
+function log(fn: any) { return fn; }
+
+@log
+function myUtil() { return "hello"; }  // Syntax error!
+```
+
+**Workaround**: Use a class with a static method, or use higher-order functions:
+
+```tsx
+// ✅ Option 1: Class with decorated method
+class Utils {
+    @log
+    static myUtil() { return "hello"; }
+}
+
+// ✅ Option 2: Higher-order function
+const log = (fn) => (...args) => { console.log('called'); return fn(...args); };
+const myUtil = log(() => "hello");
+```
+
+### ❌ Decorators on `export default function Component`
+
+Decorators cannot be applied to the component function itself:
+
+```tsx
+// ❌ This will NOT work - invalid syntax
+@withProps
+export default function Component() { ... }
+```
+
+## Supported Decorator Types (General TypeScript)
 
 ### Class Decorators
 
