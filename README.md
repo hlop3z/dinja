@@ -34,13 +34,71 @@ Safe, deterministic MDX rendering powered by a Rust core with batteries-included
 
 ```rust
 use dinja_core::service::{RenderService, RenderServiceConfig};
+use dinja_core::models::{NamedMdxBatchInput, RenderSettings, OutputFormat};
+use std::collections::HashMap;
 
 fn main() -> anyhow::Result<()> {
+    // Create a renderer instance (engine loads once)
     let config = RenderServiceConfig::default();
     let service = RenderService::new(config)?;
 
-    let html = service.render_string("example.mdx", "# Hello **dinja**")?;
-    println!("{html}");
+    // Render MDX content with full settings
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert(
+        "example.mdx".to_string(),
+        "---\ntitle: Demo\n---\n# Hello **dinja**".to_string(),
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: true,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service.render_batch(&input)?;
+
+    // Access results
+    if let Some(entry) = outcome.files.get("example.mdx") {
+        if entry.status == "success" {
+            if let Some(ref result) = entry.result {
+                println!("title: {:?}", result.metadata.get("title"));
+                println!("html: {}", result.output);
+            }
+        } else {
+            println!("error: {:?}", entry.error);
+        }
+    }
+
+    // Reuse the same instance for multiple renders with different modes
+    let mut page1 = HashMap::new();
+    page1.insert("page1.mdx".to_string(), "# Page 1".to_string());
+
+    let result1 = service.render_batch(&NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            ..Default::default()
+        },
+        mdx: page1,
+        components: None,
+    })?;
+
+    let mut page2 = HashMap::new();
+    page2.insert("page2.mdx".to_string(), "# Page 2".to_string());
+
+    let result2 = service.render_batch(&NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Schema,
+            ..Default::default()
+        },
+        mdx: page2,
+        components: None,
+    })?;
+
     Ok(())
 }
 ```
