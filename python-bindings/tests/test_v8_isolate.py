@@ -38,7 +38,7 @@ def test_renderer_multiple_modes() -> None:
     for mode in _MODES:
         result = renderer.render(
             output=mode,  # type: ignore
-            mdx=_MDX_CONTENT,
+            views=_MDX_CONTENT,
             components=_COMPONENTS,
         )
 
@@ -62,7 +62,7 @@ def test_renderer_rapid_renders() -> None:
 
     # Perform 10 rapid renders
     for i in range(10):
-        result = renderer.html(mdx={"test.mdx": f"# Test {i}"})
+        result = renderer.html(views={"test.mdx": f"# Test {i}"})
         assert result.is_all_success(), f"Failed at iteration {i}"
 
     print("  ✅ All rapid renders succeeded\n")

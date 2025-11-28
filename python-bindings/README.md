@@ -31,7 +31,7 @@ if renderer.health():
 
 # Render MDX to HTML
 result = renderer.html(
-    mdx={"page.mdx": "# Hello World\n\nThis is **bold** text."},
+    views={"page.mdx": "# Hello World\n\nThis is **bold** text."},
     utils="export default { greeting: 'Hello' }",
 )
 
@@ -44,26 +44,26 @@ print(result.get_output("page.mdx"))
 
 ```python
 # Render to HTML
-result = renderer.html(mdx={...})
+result = renderer.html(views={...})
 
 # Render to JavaScript
-result = renderer.javascript(mdx={...})
+result = renderer.javascript(views={...})
 
 # Extract schema (component names)
-result = renderer.schema(mdx={...})
+result = renderer.schema(views={...})
 
 # Render to JSON tree
-result = renderer.json(mdx={...})
+result = renderer.json(views={...})
 
 # Generic render with output format
-result = renderer.render("html", mdx={...})
+result = renderer.render("html", views={...})
 ```
 
 ## Components
 
 ```python
 result = renderer.html(
-    mdx={"app.mdx": "# App\n\n<Button>Click me</Button>"},
+    views={"app.mdx": "# App\n\n<Button>Click me</Button>"},
     components={
         "Button": "function Component(props) { return <button>{props.children}</button>; }"
     },
@@ -74,7 +74,7 @@ result = renderer.html(
 
 All render methods accept these parameters:
 
-- `mdx`: Dict mapping filenames to MDX content (required)
+- `views`: Dict mapping view names to MDX content (required)
 - `components`: Dict mapping component names to code (optional)
 - `utils`: JavaScript utilities code (optional)
 - `minify`: Enable minification (default: True)
@@ -83,7 +83,7 @@ All render methods accept these parameters:
 ## Result Object
 
 ```python
-result = renderer.html(mdx={...})
+result = renderer.html(views={...})
 
 # Check success
 result.is_all_success()  # True if all files succeeded

@@ -44,7 +44,7 @@ def test_health_check(renderer: Renderer) -> None:
 def test_render_html_simple(renderer: Renderer) -> None:
     """Test simple HTML rendering."""
     try:
-        result = renderer.html(mdx={"page.mdx": "# Hello World"})
+        result = renderer.html(views={"page.mdx": "# Hello World"})
 
         assert result.total == 1
         assert result.succeeded == 1
@@ -62,7 +62,7 @@ def test_render_html_with_frontmatter(renderer: Renderer) -> None:
     """Test HTML rendering with YAML frontmatter."""
     try:
         result = renderer.html(
-            mdx={
+            views={
                 "blog.mdx": """---
 title: My Post
 author: Alice
@@ -86,7 +86,7 @@ def test_render_html_with_component(renderer: Renderer) -> None:
     """Test HTML rendering with custom component."""
     try:
         result = renderer.html(
-            mdx={"page.mdx": "<Button>Click me</Button>"},
+            views={"page.mdx": "<Button>Click me</Button>"},
             components={
                 "Button": "export default function Component(props) { return <button>{props.children}</button>; }"
             },
@@ -106,7 +106,7 @@ def test_render_html_with_component_definition(renderer: Renderer) -> None:
     """Test Component with full parameters."""
     try:
         result = renderer.html(
-            mdx={"page.mdx": "<Card>Content</Card>"},
+            views={"page.mdx": "<Card>Content</Card>"},
             components={
                 "Card": Component(
                     code="export default function Component({ children }) { return <div class='card'>{children}</div>; }",
@@ -131,7 +131,7 @@ def test_render_html_with_utils(renderer: Renderer) -> None:
     """Test HTML rendering with utils."""
     try:
         result = renderer.html(
-            mdx={"page.mdx": "<Greeting />"},
+            views={"page.mdx": "<Greeting />"},
             components={
                 "Greeting": "export default function Component() { return <div>{utils.greeting}</div>; }"
             },
@@ -151,7 +151,7 @@ def test_render_html_batch(renderer: Renderer) -> None:
     """Test batch HTML rendering with multiple files."""
     try:
         result = renderer.html(
-            mdx={
+            views={
                 "page1.mdx": "# Page 1",
                 "page2.mdx": "# Page 2",
                 "page3.mdx": "# Page 3",
@@ -174,7 +174,7 @@ def test_render_html_batch(renderer: Renderer) -> None:
 def test_render_javascript(renderer: Renderer) -> None:
     """Test JavaScript output format."""
     try:
-        result = renderer.javascript(mdx={"page.mdx": "# Hello"})
+        result = renderer.javascript(views={"page.mdx": "# Hello"})
 
         assert result.is_all_success()
 
@@ -195,7 +195,7 @@ def test_render_schema(renderer: Renderer) -> None:
     """Test schema extraction."""
     try:
         result = renderer.schema(
-            mdx={"page.mdx": "<Button>Click</Button><Card>Content</Card>"}
+            views={"page.mdx": "<Button>Click</Button><Card>Content</Card>"}
         )
 
         assert result.is_all_success()
@@ -214,7 +214,7 @@ def test_render_schema(renderer: Renderer) -> None:
 def test_render_json(renderer: Renderer) -> None:
     """Test JSON tree output."""
     try:
-        result = renderer.json(mdx={"page.mdx": "# Hello"})
+        result = renderer.json(views={"page.mdx": "# Hello"})
 
         assert result.is_all_success()
 
@@ -234,7 +234,7 @@ def test_render_generic_method(renderer: Renderer) -> None:
     try:
         result = renderer.render(
             output="html",
-            mdx={"page.mdx": "# Hello"},
+            views={"page.mdx": "# Hello"},
         )
 
         assert result.is_all_success()
@@ -254,7 +254,7 @@ def test_render_generic_method(renderer: Renderer) -> None:
 def test_input_dataclass() -> None:
     """Test Input dataclass creation and conversion."""
     input_obj = Input(
-        mdx={"page.mdx": "# Hello"},
+        views={"page.mdx": "# Hello"},
         utils="export default {}",
         minify=True,
         directives=["v-"],
@@ -270,7 +270,7 @@ def test_input_dataclass() -> None:
 def test_input_with_string_components() -> None:
     """Test Input with string components (auto-converted to Component)."""
     input_obj = Input(
-        mdx={"page.mdx": "# Hello"},
+        views={"page.mdx": "# Hello"},
         components={"Button": "export default function() {}"},
     )
 

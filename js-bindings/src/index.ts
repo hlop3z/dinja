@@ -24,8 +24,8 @@ export interface Component {
 
 /** Input structure for MDX rendering requests */
 export interface Input {
-  /** Map of file names to MDX content strings */
-  mdx: Record<string, string>;
+  /** Map of view names to MDX content strings */
+  views: Record<string, string>;
   /** Optional JavaScript snippet for global utilities (export default { ... }) */
   utils?: string;
   /** Optional map of component names to their definitions or code strings */
@@ -78,7 +78,7 @@ export interface RendererConfig {
  */
 function buildRequestData(input: Input): Record<string, unknown> {
   const result: Record<string, unknown> = {
-    mdx: input.mdx,
+    mdx: input.views,
     minify: input.minify ?? true,
   };
 

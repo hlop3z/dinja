@@ -57,14 +57,14 @@ class Input:
     """Input structure for MDX rendering requests.
 
     Attributes:
-        mdx: Map of file names to MDX content strings - required
+        views: Map of view names to MDX content strings - required
         utils: Optional JavaScript snippet for global utilities (export default { ... })
         components: Optional map of component names to their definitions
         minify: Enable minification (default: True)
         directives: Optional list of directive prefixes for schema extraction
     """
 
-    mdx: dict[str, str]
+    views: dict[str, str]
     utils: str | None = None
     components: dict[str, Component] | dict[str, str] | None = None
     minify: bool = True
@@ -80,7 +80,7 @@ class Input:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
-        result: dict[str, Any] = {"mdx": self.mdx, "minify": self.minify}
+        result: dict[str, Any] = {"mdx": self.views, "minify": self.minify}
         if self.utils is not None:
             result["utils"] = self.utils
         if self.directives is not None:
@@ -164,7 +164,7 @@ class Result:
 
 
 def _build_request_data(
-    mdx: dict[str, str],
+    views: dict[str, str],
     components: dict[str, Component] | dict[str, str] | None = None,
     minify: bool = True,
     utils: str | None = None,
@@ -176,7 +176,7 @@ def _build_request_data(
         if all(isinstance(v, str) for v in components.values()):
             components = Component.from_dict(components)  # type: ignore
 
-    result: dict[str, Any] = {"mdx": mdx, "minify": minify}
+    result: dict[str, Any] = {"mdx": views, "minify": minify}
     if utils is not None:
         result["utils"] = utils
     if directives is not None:
@@ -246,7 +246,7 @@ class Renderer:
 
     def html(
         self,
-        mdx: dict[str, str],
+        views: dict[str, str],
         components: dict[str, Component] | dict[str, str] | None = None,
         minify: bool = True,
         utils: str | None = None,
@@ -255,7 +255,7 @@ class Renderer:
         """Render MDX to HTML.
 
         Args:
-            mdx: Map of file names to MDX content strings
+            views: Map of view names to MDX content strings
             components: Optional map of component names to their definitions
             minify: Enable minification (default: True)
             utils: Optional JavaScript snippet for global utilities
@@ -264,13 +264,13 @@ class Renderer:
         Returns:
             Result with rendered HTML output
         """
-        data = _build_request_data(mdx, components, minify, utils, directives)
+        data = _build_request_data(views, components, minify, utils, directives)
         response = self._request("/render/html", data)
         return Result.from_dict(response)
 
     def javascript(
         self,
-        mdx: dict[str, str],
+        views: dict[str, str],
         components: dict[str, Component] | dict[str, str] | None = None,
         minify: bool = True,
         utils: str | None = None,
@@ -279,7 +279,7 @@ class Renderer:
         """Render MDX to JavaScript.
 
         Args:
-            mdx: Map of file names to MDX content strings
+            views: Map of view names to MDX content strings
             components: Optional map of component names to their definitions
             minify: Enable minification (default: True)
             utils: Optional JavaScript snippet for global utilities
@@ -288,13 +288,13 @@ class Renderer:
         Returns:
             Result with JavaScript output
         """
-        data = _build_request_data(mdx, components, minify, utils, directives)
+        data = _build_request_data(views, components, minify, utils, directives)
         response = self._request("/render/javascript", data)
         return Result.from_dict(response)
 
     def schema(
         self,
-        mdx: dict[str, str],
+        views: dict[str, str],
         components: dict[str, Component] | dict[str, str] | None = None,
         minify: bool = True,
         utils: str | None = None,
@@ -303,7 +303,7 @@ class Renderer:
         """Extract schema from MDX (component names).
 
         Args:
-            mdx: Map of file names to MDX content strings
+            views: Map of view names to MDX content strings
             components: Optional map of component names to their definitions
             minify: Enable minification (default: True)
             utils: Optional JavaScript snippet for global utilities
@@ -312,13 +312,13 @@ class Renderer:
         Returns:
             Result with schema output
         """
-        data = _build_request_data(mdx, components, minify, utils, directives)
+        data = _build_request_data(views, components, minify, utils, directives)
         response = self._request("/render/schema", data)
         return Result.from_dict(response)
 
     def json(
         self,
-        mdx: dict[str, str],
+        views: dict[str, str],
         components: dict[str, Component] | dict[str, str] | None = None,
         minify: bool = True,
         utils: str | None = None,
@@ -327,7 +327,7 @@ class Renderer:
         """Render MDX to JSON tree.
 
         Args:
-            mdx: Map of file names to MDX content strings
+            views: Map of view names to MDX content strings
             components: Optional map of component names to their definitions
             minify: Enable minification (default: True)
             utils: Optional JavaScript snippet for global utilities
@@ -336,14 +336,14 @@ class Renderer:
         Returns:
             Result with JSON tree output
         """
-        data = _build_request_data(mdx, components, minify, utils, directives)
+        data = _build_request_data(views, components, minify, utils, directives)
         response = self._request("/render/json", data)
         return Result.from_dict(response)
 
     def render(
         self,
         output: Output,
-        mdx: dict[str, str],
+        views: dict[str, str],
         components: dict[str, Component] | dict[str, str] | None = None,
         minify: bool = True,
         utils: str | None = None,
@@ -353,7 +353,7 @@ class Renderer:
 
         Args:
             output: Output format ("html", "javascript", "schema", "json")
-            mdx: Map of file names to MDX content strings
+            views: Map of view names to MDX content strings
             components: Optional map of component names to their definitions
             minify: Enable minification (default: True)
             utils: Optional JavaScript snippet for global utilities
@@ -362,7 +362,7 @@ class Renderer:
         Returns:
             Result with rendered output
         """
-        data = _build_request_data(mdx, components, minify, utils, directives)
+        data = _build_request_data(views, components, minify, utils, directives)
         response = self._request(f"/render/{output}", data)
         return Result.from_dict(response)
 

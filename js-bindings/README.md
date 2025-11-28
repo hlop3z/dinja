@@ -38,7 +38,7 @@ if (await renderer.health()) {
 
 // Render MDX to HTML
 const result = await renderer.html({
-  mdx: { 'page.mdx': '# Hello World\n\nThis is **bold** text.' },
+  views: { 'page.mdx': '# Hello World\n\nThis is **bold** text.' },
   utils: "export default { greeting: 'Hello' }",
 });
 
@@ -51,26 +51,26 @@ console.log(getOutput(result, 'page.mdx'));
 
 ```typescript
 // Render to HTML
-const result = await renderer.html({ mdx: {...} });
+const result = await renderer.html({ views: {...} });
 
 // Render to JavaScript
-const result = await renderer.javascript({ mdx: {...} });
+const result = await renderer.javascript({ views: {...} });
 
 // Extract schema (component names)
-const result = await renderer.schema({ mdx: {...} });
+const result = await renderer.schema({ views: {...} });
 
 // Render to JSON tree
-const result = await renderer.json({ mdx: {...} });
+const result = await renderer.json({ views: {...} });
 
 // Generic render with output format
-const result = await renderer.render('html', { mdx: {...} });
+const result = await renderer.render('html', { views: {...} });
 ```
 
 ### Components
 
 ```typescript
 const result = await renderer.html({
-  mdx: { 'app.mdx': '# App\n\n<Button>Click me</Button>' },
+  views: { 'app.mdx': '# App\n\n<Button>Click me</Button>' },
   components: {
     Button: 'function Component(props) { return <button>{props.children}</button>; }',
   },
@@ -81,7 +81,7 @@ const result = await renderer.html({
 
 All render methods accept an `Input` object with:
 
-- `mdx`: Record mapping filenames to MDX content (required)
+- `views`: Record mapping view names to MDX content (required)
 - `components`: Record mapping component names to code (optional)
 - `utils`: JavaScript utilities code (optional)
 - `minify`: Enable minification (default: true)
@@ -90,7 +90,7 @@ All render methods accept an `Input` object with:
 ### Result Object
 
 ```typescript
-const result = await renderer.html({ mdx: {...} });
+const result = await renderer.html({ views: {...} });
 
 // Check success
 isAllSuccess(result);  // true if all files succeeded
