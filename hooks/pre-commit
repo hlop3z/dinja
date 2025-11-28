@@ -195,8 +195,10 @@ print_step "Checking version consistency..."
 if [ -f "VERSION" ]; then
     VERSION=$(cat VERSION | tr -d '[:space:]')
 
-    # Check Cargo.toml version
-    CARGO_VERSION=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+    # Check Cargo.toml version (using pure bash to avoid sed dependency on Windows)
+    CARGO_LINE=$(grep -m1 '^version' Cargo.toml)
+    CARGO_VERSION="${CARGO_LINE#*\"}"
+    CARGO_VERSION="${CARGO_VERSION%%\"*}"
 
     if [ "$VERSION" != "$CARGO_VERSION" ]; then
         print_error "VERSION ($VERSION) doesn't match Cargo.toml ($CARGO_VERSION)"
