@@ -455,6 +455,11 @@ fn render_markdown(content: &str) -> Result<String, MdxError> {
 /// Input:  `<code>console.log(${name});</code>`
 /// Output: `<code>console.log(${'{'}'name'{'}');</code>`
 fn escape_code_block_braces(html: &str) -> String {
+    // Fast path: if no code blocks, return as-is
+    if !html.contains("<code") {
+        return html.to_string();
+    }
+
     // Match content inside <code>...</code> tags only
     // Markdown generates: <pre><code class="language-xxx">content</code></pre>
     // We target <code> specifically since that's where the actual code content lives
@@ -479,8 +484,19 @@ fn escape_code_block_braces(html: &str) -> String {
 /// Escapes curly braces in a single pass to avoid double-escaping.
 ///
 /// Converts `{` to `{'{'}` and `}` to `{'}'}` for JSX literal rendering.
+#[inline]
 fn escape_braces_in_content(content: &str) -> String {
-    let mut result = String::with_capacity(content.len() * 2);
+    // Fast path: if no braces, return content as-is without allocation
+    if !content.contains('{') && !content.contains('}') {
+        return content.to_string();
+    }
+
+    // Count braces to pre-allocate exact capacity needed
+    // Each brace expands from 1 char to 5 chars (net +4)
+    let brace_count = content.chars().filter(|&c| c == '{' || c == '}').count();
+    let capacity = content.len() + (brace_count * 4);
+
+    let mut result = String::with_capacity(capacity);
     for ch in content.chars() {
         match ch {
             '{' => result.push_str("{'{'}"),
