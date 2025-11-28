@@ -23,7 +23,7 @@ use oxc_codegen::{Codegen, CodegenOptions};
 use oxc_parser::Parser;
 use oxc_semantic::SemanticBuilder;
 use oxc_span::SourceType;
-use oxc_transformer::{JsxRuntime, TransformOptions, Transformer};
+use oxc_transformer::{DecoratorOptions, JsxRuntime, TransformOptions, Transformer};
 use std::borrow::Cow;
 use std::cmp::Reverse;
 use std::collections::HashSet;
@@ -68,15 +68,31 @@ pub fn wrap_in_component(tsx_content: &str) -> String {
 /// # Returns
 /// Configured `TransformOptions` for Oxc transformer
 pub fn create_transform_options(config: &TsxTransformConfig) -> TransformOptions {
-    // Start with ES5 target preset
+    // Target esnext since Deno Core uses V8 which supports all modern ES features.
+    // This preserves arrow functions, classes, async/await, optional chaining, etc.
+    // instead of downleveling them to ES5 which creates larger, slower code.
     let mut options =
-        TransformOptions::from_target("es5").unwrap_or_else(|_| TransformOptions::enable_all());
-    // Clone is necessary here as TransformOptions requires owned String values
+        TransformOptions::from_target("esnext").unwrap_or_else(|_| TransformOptions::default());
+
+    // JSX configuration
     options.jsx.pragma = Some(config.jsx_pragma.clone());
     options.jsx.pragma_frag = Some(config.jsx_pragma_frag.clone());
     options.jsx.runtime = JsxRuntime::Classic;
     options.jsx.development = false;
     options.jsx.refresh = None;
+
+    // Enable TypeScript legacy decorators (experimentalDecorators + emitDecoratorMetadata).
+    // This supports the decorator syntax used by Angular, NestJS, TypeORM, MobX, etc.
+    //
+    // NOTE: TC39 Stage 3 decorators (2023 standard) are NOT yet supported by OXC transformer.
+    // See: https://github.com/oxc-project/oxc/issues/9170
+    // The parser can parse TC39 syntax, but transformation is not implemented.
+    // Most frameworks still use legacy decorators, so this should cover common use cases.
+    options.decorator = DecoratorOptions {
+        legacy: true,
+        emit_decorator_metadata: true,
+    };
+
     options
 }
 

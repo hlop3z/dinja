@@ -88,6 +88,7 @@ nav:
     - RenderService: rust/render-service.md
   - Guides:
     - Components: guides/components.md
+    - Decorators: guides/decorators.md
     - Output Formats: guides/output-formats.md
     - Performance: guides/performance.md
   - Development:

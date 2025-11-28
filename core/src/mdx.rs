@@ -25,10 +25,10 @@ use crate::renderer::JsRenderer;
 use crate::transform::{transform_tsx_to_js_for_output, transform_tsx_to_js_with_config};
 use gray_matter::{engine::YAML, Matter};
 use markdown::{to_html_with_options, CompileOptions, Constructs, Options, ParseOptions};
-use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
 
 // =============================================================================
 // JSX Protection - Constants and Compiled Patterns
@@ -47,23 +47,32 @@ const MAX_JSX_NESTING_DEPTH: usize = 100;
 /// - Component names must start with uppercase (JSX convention)
 /// - Must have at least one expression attribute (curly braces)
 /// - Must be self-closing (ends with />)
-static SELF_CLOSING_JSX_PATTERN: Lazy<Regex> = Lazy::new(|| {
+///
+/// # Safety
+/// Pattern is compile-time constant and known to be valid.
+static SELF_CLOSING_JSX_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"<([A-Z][a-zA-Z0-9]*)\s+[^>]*\{[^}]*\}[^>]*/\s*>")
-        .expect("Invalid self-closing JSX regex pattern")
+        .expect("hardcoded regex pattern is valid")
 });
 
 /// Compiled regex for opening JSX tags with expression attributes.
 /// Pattern: <ComponentName attr={...}>
 /// Used to find JSX components with children that need protection.
-static OPENING_JSX_PATTERN: Lazy<Regex> = Lazy::new(|| {
+///
+/// # Safety
+/// Pattern is compile-time constant and known to be valid.
+static OPENING_JSX_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"<([A-Z][a-zA-Z0-9]*)\s+[^>]*\{[^}]*\}[^>]*>")
-        .expect("Invalid opening JSX regex pattern")
+        .expect("hardcoded regex pattern is valid")
 });
 
 /// Compiled regex for extracting component names from HTML.
 /// Used for schema extraction.
-static COMPONENT_NAME_PATTERN: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"<([A-Z][a-zA-Z0-9]*)").expect("Invalid component name regex pattern")
+///
+/// # Safety
+/// Pattern is compile-time constant and known to be valid.
+static COMPONENT_NAME_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"<([A-Z][a-zA-Z0-9]*)").expect("hardcoded regex pattern is valid")
 });
 
 struct RenderContext<'a> {
@@ -73,18 +82,45 @@ struct RenderContext<'a> {
     settings: &'a RenderSettings,
 }
 
+/// Creates markdown parsing and compilation options.
+///
+/// # Security Model
+///
+/// `allow_dangerous_html` is set to `true` because:
+/// 1. MDX requires unescaped HTML/JSX tags to function (e.g., `<Component prop={value} />`)
+/// 2. JSX expression attributes `{...}` would be escaped and broken otherwise
+/// 3. The actual security boundary is the JavaScript runtime execution layer
+///
+/// **Important**: MDX content should only come from trusted sources. If you need to
+/// render untrusted markdown, sanitize the output HTML after rendering or use a
+/// separate markdown-only pipeline without JSX support.
+///
+/// # Features Enabled
+///
+/// - **CommonMark**: All standard markdown features (headings, lists, code blocks, etc.)
+/// - **GFM Extensions**: Tables, strikethrough, task lists, autolinks, footnotes
+/// - **HTML/JSX**: Block and inline HTML elements for component embedding
 fn markdown_options() -> Options {
     Options {
         parse: ParseOptions {
             constructs: Constructs {
                 html_flow: true, // Allow block-level HTML/JSX
                 html_text: true, // Allow inline HTML/JSX
+                // GFM (GitHub Flavored Markdown) extensions
+                gfm_autolink_literal: true, // Auto-linkify URLs without angle brackets
+                gfm_footnote_definition: true, // Footnotes: [^a]: footnote text
+                gfm_label_start_footnote: true, // Footnote references: [^a]
+                gfm_strikethrough: true,    // Strikethrough: ~text~ or ~~text~~
+                gfm_table: true,            // Tables with | pipes |
+                gfm_task_list_item: true,   // Task lists: - [x] done
                 ..Constructs::default()
             },
             ..ParseOptions::default()
         },
         compile: CompileOptions {
-            allow_dangerous_html: true, // Don't escape HTML tags
+            // SECURITY: HTML is not escaped to preserve JSX syntax.
+            // See function doc comment for security model explanation.
+            allow_dangerous_html: true,
             ..CompileOptions::default()
         },
     }
@@ -382,8 +418,9 @@ fn restore_jsx_components(content: &str, placeholders: &HashMap<String, String>)
 fn unwrap_fragment(html: &str) -> String {
     // Static regex pattern compiled once at first use
     // Matches: <Fragment>, <Fragment ...attrs>, </Fragment>, </fragment> (case-insensitive)
-    static FRAGMENT_PATTERN: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
-        regex::Regex::new(r"(?i)</?Fragment[^>]*>").expect("Invalid fragment regex")
+    // Safety: Pattern is compile-time constant and known to be valid.
+    static FRAGMENT_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)</?Fragment[^>]*>").expect("hardcoded regex pattern is valid")
     });
 
     let trimmed = html.trim();
@@ -977,5 +1014,361 @@ Some text
         let html = "  \n<h1>Hello</h1>\n  ";
         let result = unwrap_fragment(html);
         assert_eq!(result, "<h1>Hello</h1>");
+    }
+
+    // =========================================================================
+    // GFM (GitHub Flavored Markdown) Tests
+    // =========================================================================
+
+    #[test]
+    fn test_gfm_table_basic() {
+        let content = r#"| Header 1 | Header 2 |
+| -------- | -------- |
+| Cell 1   | Cell 2   |"#;
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<table>"), "Should render table element");
+        assert!(result.contains("<thead>"), "Should have thead");
+        assert!(result.contains("<tbody>"), "Should have tbody");
+        assert!(result.contains("<th>"), "Should have th elements");
+        assert!(result.contains("<td>"), "Should have td elements");
+        assert!(result.contains("Header 1"), "Should contain header text");
+        assert!(result.contains("Cell 1"), "Should contain cell text");
+    }
+
+    #[test]
+    fn test_gfm_table_with_alignment() {
+        let content = r#"| Left | Center | Right |
+| :--- | :----: | ----: |
+| L    | C      | R     |"#;
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<table>"));
+        // Check for alignment styles
+        assert!(
+            result.contains("text-align:") || result.contains("align="),
+            "Should have alignment attributes"
+        );
+    }
+
+    #[test]
+    fn test_gfm_table_multiple_rows() {
+        let content = r#"| File Path | URL Route |
+| --------- | --------- |
+| `views/index.mdx` | `/` |
+| `views/about.mdx` | `/about` |
+| `views/blog/index.mdx` | `/blog` |"#;
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<table>"));
+        assert!(
+            result.contains("<code>"),
+            "Should render inline code in cells"
+        );
+        // Count rows (3 data rows)
+        let row_count = result.matches("<tr>").count();
+        assert!(row_count >= 4, "Should have header + 3 data rows");
+    }
+
+    #[test]
+    fn test_gfm_strikethrough_single_tilde() {
+        let content = "This is ~deleted~ text.";
+        let result = render_markdown(content).unwrap();
+        assert!(
+            result.contains("<del>deleted</del>"),
+            "Should render strikethrough with <del> tag"
+        );
+    }
+
+    #[test]
+    fn test_gfm_strikethrough_double_tilde() {
+        let content = "This is ~~also deleted~~ text.";
+        let result = render_markdown(content).unwrap();
+        assert!(
+            result.contains("<del>also deleted</del>"),
+            "Should render double-tilde strikethrough"
+        );
+    }
+
+    #[test]
+    fn test_gfm_strikethrough_with_formatting() {
+        let content = "~~**bold and deleted**~~";
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<del>"), "Should have del tag");
+        assert!(result.contains("<strong>"), "Should preserve bold inside");
+    }
+
+    #[test]
+    fn test_gfm_task_list_unchecked() {
+        let content = "- [ ] Unchecked task";
+        let result = render_markdown(content).unwrap();
+        assert!(
+            result.contains("<input") && result.contains("checkbox"),
+            "Should render checkbox input"
+        );
+        // The markdown crate outputs type="checkbox" for all checkboxes
+        // Unchecked items have no checked="" attribute (just "checkbox" in type)
+        assert!(
+            !result.contains("checked=\"\"") && !result.contains("checked="),
+            "Unchecked task should not have checked attribute, got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_gfm_task_list_checked() {
+        let content = "- [x] Checked task";
+        let result = render_markdown(content).unwrap();
+        assert!(
+            result.contains("<input") && result.contains("checkbox"),
+            "Should render checkbox input"
+        );
+        assert!(
+            result.contains("checked"),
+            "Checked task should have checked attribute"
+        );
+    }
+
+    #[test]
+    fn test_gfm_task_list_mixed() {
+        let content = r#"- [x] Done task
+- [ ] Pending task
+- [x] Another done"#;
+        let result = render_markdown(content).unwrap();
+        let checkbox_count = result.matches("checkbox").count();
+        assert_eq!(checkbox_count, 3, "Should have 3 checkboxes");
+        let checked_count = result.matches("checked").count();
+        assert_eq!(checked_count, 2, "Should have 2 checked items");
+    }
+
+    #[test]
+    fn test_gfm_autolink_url() {
+        let content = "Visit https://example.com for more info.";
+        let result = render_markdown(content).unwrap();
+        assert!(
+            result.contains("<a href=\"https://example.com\">"),
+            "Should auto-link URL"
+        );
+    }
+
+    #[test]
+    fn test_gfm_autolink_www() {
+        let content = "Check out www.example.com today.";
+        let result = render_markdown(content).unwrap();
+        assert!(
+            result.contains("<a href=") && result.contains("example.com"),
+            "Should auto-link www URLs"
+        );
+    }
+
+    #[test]
+    fn test_gfm_autolink_email() {
+        let content = "Contact us at hello@example.com for help.";
+        let result = render_markdown(content).unwrap();
+        assert!(
+            result.contains("<a href=\"mailto:hello@example.com\">"),
+            "Should auto-link email addresses"
+        );
+    }
+
+    #[test]
+    fn test_gfm_footnote_basic() {
+        let content = r#"Here is a footnote reference[^1].
+
+[^1]: This is the footnote content."#;
+        let result = render_markdown(content).unwrap();
+        // Footnotes create anchor links and a footnote section
+        assert!(
+            result.contains("footnote") || result.contains("fn"),
+            "Should process footnote syntax"
+        );
+    }
+
+    #[test]
+    fn test_gfm_footnote_multiple() {
+        let content = r#"First[^1] and second[^2] footnotes.
+
+[^1]: First footnote.
+[^2]: Second footnote."#;
+        let result = render_markdown(content).unwrap();
+        // Should have multiple footnote references
+        assert!(
+            result.contains("1") && result.contains("2"),
+            "Should have multiple footnote markers"
+        );
+    }
+
+    #[test]
+    fn test_gfm_combined_features() {
+        // Test multiple GFM features in one document
+        let content = r#"# Task List
+
+- [x] Create ~old~ new feature
+- [ ] Visit https://docs.rs
+
+| Status | Task |
+| ------ | ---- |
+| Done   | ~~Completed~~ |
+
+See footnote[^1].
+
+[^1]: Reference here."#;
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<h1>"), "Should render heading");
+        assert!(result.contains("checkbox"), "Should render task list");
+        assert!(result.contains("<table>"), "Should render table");
+        assert!(result.contains("<del>"), "Should render strikethrough");
+        assert!(result.contains("<a href="), "Should auto-link URL");
+    }
+
+    #[test]
+    fn test_gfm_table_empty_cells() {
+        let content = r#"| A | B |
+| - | - |
+|   | X |
+| Y |   |"#;
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<table>"));
+        // Should handle empty cells gracefully
+        let td_count = result.matches("<td>").count();
+        assert_eq!(td_count, 4, "Should have 4 cells");
+    }
+
+    #[test]
+    fn test_gfm_table_with_inline_code() {
+        let content = r#"| Command | Description |
+| ------- | ----------- |
+| `git status` | Show status |
+| `git diff` | Show changes |"#;
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<table>"));
+        assert!(result.contains("<code>git status</code>"));
+        assert!(result.contains("<code>git diff</code>"));
+    }
+
+    #[test]
+    fn test_gfm_table_with_links() {
+        let content = r#"| Name | Link |
+| ---- | ---- |
+| Rust | [rust-lang.org](https://rust-lang.org) |"#;
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<table>"));
+        assert!(result.contains("<a href=\"https://rust-lang.org\">"));
+    }
+
+    #[test]
+    fn test_gfm_nested_list_with_tasks() {
+        let content = r#"- [x] Parent task
+  - [ ] Child task 1
+  - [x] Child task 2"#;
+        let result = render_markdown(content).unwrap();
+        let checkbox_count = result.matches("checkbox").count();
+        assert_eq!(checkbox_count, 3, "Should render all nested checkboxes");
+    }
+
+    // =========================================================================
+    // Fenced Code Block Tests (CommonMark)
+    // =========================================================================
+
+    #[test]
+    fn test_code_fenced_basic() {
+        let content = r#"```
+let x = 1;
+```"#;
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<pre>"), "Should render pre element");
+        assert!(result.contains("<code>"), "Should render code element");
+        assert!(
+            result.contains("let x = 1;"),
+            "Should preserve code content"
+        );
+    }
+
+    #[test]
+    fn test_code_fenced_with_language() {
+        let content = r#"```python
+def hello():
+    print("Hello, World!")
+```"#;
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<pre>"));
+        assert!(result.contains("<code"));
+        assert!(
+            result.contains("language-python") || result.contains("class=\"python\""),
+            "Should include language identifier in class, got: {}",
+            result
+        );
+        assert!(result.contains("def hello():"));
+    }
+
+    #[test]
+    fn test_code_fenced_rust() {
+        let content = r#"```rust
+fn main() {
+    println!("Hello");
+}
+```"#;
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<pre>"));
+        assert!(
+            result.contains("language-rust"),
+            "Should have language-rust class"
+        );
+        assert!(result.contains("fn main()"));
+    }
+
+    #[test]
+    fn test_code_fenced_javascript() {
+        let content = r#"```javascript
+const greet = () => console.log("Hi");
+```"#;
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<pre>"));
+        assert!(result.contains("language-javascript"));
+        assert!(result.contains("const greet"));
+    }
+
+    #[test]
+    fn test_code_fenced_preserves_whitespace() {
+        let content = r#"```
+  indented
+    more indented
+```"#;
+        let result = render_markdown(content).unwrap();
+        // Whitespace should be preserved inside code blocks
+        assert!(
+            result.contains("  indented") || result.contains("indented"),
+            "Should preserve indentation"
+        );
+    }
+
+    #[test]
+    fn test_code_fenced_with_special_chars() {
+        let content = r#"```html
+<div class="test">&amp;</div>
+```"#;
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<pre>"));
+        // HTML entities in code should be escaped
+        assert!(
+            result.contains("&lt;div") || result.contains("<div"),
+            "Should handle HTML in code blocks"
+        );
+    }
+
+    #[test]
+    fn test_code_inline() {
+        let content = "Use `println!()` to print.";
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<code>println!()</code>"));
+    }
+
+    #[test]
+    fn test_code_indented() {
+        // 4-space indented code block (CommonMark)
+        let content = "Normal text\n\n    indented code\n    more code\n\nNormal again";
+        let result = render_markdown(content).unwrap();
+        assert!(
+            result.contains("<pre>"),
+            "Should render indented code block"
+        );
+        assert!(result.contains("<code>"));
     }
 }

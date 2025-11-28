@@ -22,8 +22,14 @@ async fn main() -> std::io::Result<()> {
     println!("🦀 Starting Dinja MDX server on http://{}", bind_addr);
 
     let config = RenderServiceConfig::from_env();
-    let service = RenderService::new(config)
-        .expect("Failed to initialize render service with invalid configuration");
+    let service = match RenderService::new(config) {
+        Ok(svc) => svc,
+        Err(err) => {
+            eprintln!("❌ Failed to initialize render service: {}", err);
+            eprintln!("   Check your configuration and resource limits.");
+            std::process::exit(1);
+        }
+    };
 
     HttpServer::new(move || {
         App::new()

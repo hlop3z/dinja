@@ -223,13 +223,15 @@ impl RenderServiceConfig {
             ));
         }
 
-        // Validate max_cached_renderers is reasonable
+        // Validate max_cached_renderers is reasonable.
+        // Each cached renderer holds a V8 isolate which consumes ~10-50MB of memory.
+        // Limit to 100 to prevent excessive memory usage (100 * 50MB = 5GB max).
         if self.max_cached_renderers == 0 {
             return Err("max_cached_renderers must be greater than 0".to_string());
         }
-        if self.max_cached_renderers > 1000 {
+        if self.max_cached_renderers > 100 {
             return Err(format!(
-                "max_cached_renderers ({}) is unreasonably large, maximum recommended is 1000",
+                "max_cached_renderers ({}) exceeds maximum of 100 (each uses ~10-50MB memory)",
                 self.max_cached_renderers
             ));
         }
