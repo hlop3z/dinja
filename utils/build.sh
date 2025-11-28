@@ -78,6 +78,17 @@ test_python() {
 
     log_info "Running Python HTTP client tests..."
     log_warn "Note: Dinja service must be running on http://localhost:8080"
+    log_warn "Start with: docker run -p 8080:8080 ghcr.io/hlop3z/dinja:latest"
+
+    # Check if service is reachable
+    if command_exists curl; then
+        if ! curl -s --connect-timeout 2 http://localhost:8080/health > /dev/null 2>&1; then
+            log_error "Cannot reach Dinja service at http://localhost:8080"
+            log_error "Start the service first: docker run -p 8080:8080 ghcr.io/hlop3z/dinja:latest"
+            return 1
+        fi
+        log_info "Service is running at http://localhost:8080"
+    fi
 
     cd python-bindings
     uv sync --dev
