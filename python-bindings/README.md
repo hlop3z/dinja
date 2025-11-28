@@ -109,8 +109,8 @@ from dinja import (
     Input,         # Input dataclass
     Result,        # Batch result dataclass
     FileResult,    # Individual file result
-    ComponentDefinition,  # Component definition
-    OutputFormat,  # Type alias: "html" | "javascript" | "schema" | "json"
+    Component,     # Component definition
+    Output,        # Type alias: "html" | "javascript" | "schema" | "json"
 )
 ```
 

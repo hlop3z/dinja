@@ -118,8 +118,8 @@ import {
   Input,              // Input interface
   Result,             // Batch result interface
   FileResult,         // Individual file result
-  ComponentDefinition, // Component definition
-  OutputFormat,       // Type: "html" | "javascript" | "schema" | "json"
+  Component,          // Component definition
+  Output,             // Type: "html" | "javascript" | "schema" | "json"
   RendererConfig,     // Renderer configuration
   isAllSuccess,       // Helper function
   getOutput,          // Helper function

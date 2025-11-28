@@ -8,10 +8,10 @@
  */
 
 /** Output format options */
-export type OutputFormat = "html" | "javascript" | "schema" | "json";
+export type Output = "html" | "javascript" | "schema" | "json";
 
 /** Component definition with code and metadata */
-export interface ComponentDefinition {
+export interface Component {
   /** Component code (JSX/TSX) - required */
   code: string;
   /** Component name (optional, defaults to dict key) */
@@ -29,7 +29,7 @@ export interface Input {
   /** Optional JavaScript snippet for global utilities (export default { ... }) */
   utils?: string;
   /** Optional map of component names to their definitions or code strings */
-  components?: Record<string, ComponentDefinition | string>;
+  components?: Record<string, Component | string>;
   /** Enable minification (default: true) */
   minify?: boolean;
   /** Optional list of directive prefixes for schema extraction */
@@ -91,7 +91,7 @@ function buildRequestData(input: Input): Record<string, unknown> {
   }
 
   if (input.components !== undefined) {
-    const components: Record<string, ComponentDefinition> = {};
+    const components: Record<string, Component> = {};
     for (const [name, comp] of Object.entries(input.components)) {
       if (typeof comp === "string") {
         components[name] = { code: comp, name };
@@ -222,7 +222,7 @@ export class Renderer {
    * @param input - Input data with mdx content, utils, and components
    * @returns Result with rendered output
    */
-  async render(output: OutputFormat, input: Input): Promise<Result> {
+  async render(output: Output, input: Input): Promise<Result> {
     return this.request(`/render/${output}`, buildRequestData(input));
   }
 

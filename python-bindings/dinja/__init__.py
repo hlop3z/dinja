@@ -16,11 +16,11 @@ from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
 # Type aliases
-OutputFormat = Literal["html", "javascript", "schema", "json"]
+Output = Literal["html", "javascript", "schema", "json"]
 
 
 @dataclass
-class ComponentDefinition:
+class Component:
     """Component definition with code and metadata.
 
     Attributes:
@@ -36,8 +36,8 @@ class ComponentDefinition:
     args: Any | None = None
 
     @classmethod
-    def from_dict(cls, components: dict[str, str]) -> dict[str, ComponentDefinition]:
-        """Create a dictionary of ComponentDefinition from a dict of name->code."""
+    def from_dict(cls, components: dict[str, str]) -> dict[str, Component]:
+        """Create a dictionary of Component from a dict of name->code."""
         return {name: cls(code=code, name=name) for name, code in components.items()}
 
     def to_dict(self) -> dict[str, Any]:
@@ -66,15 +66,15 @@ class Input:
 
     mdx: dict[str, str]
     utils: str | None = None
-    components: dict[str, ComponentDefinition] | dict[str, str] | None = None
+    components: dict[str, Component] | dict[str, str] | None = None
     minify: bool = True
     directives: list[str] | None = None
 
     def __post_init__(self) -> None:
-        """Convert dict[str, str] components to dict[str, ComponentDefinition]."""
+        """Convert dict[str, str] components to dict[str, Component]."""
         if self.components is not None:
             if all(isinstance(v, str) for v in self.components.values()):
-                self.components = ComponentDefinition.from_dict(
+                self.components = Component.from_dict(
                     self.components  # type: ignore[arg-type]
                 )
 
@@ -165,16 +165,16 @@ class Result:
 
 def _build_request_data(
     mdx: dict[str, str],
-    components: dict[str, ComponentDefinition] | dict[str, str] | None = None,
+    components: dict[str, Component] | dict[str, str] | None = None,
     minify: bool = True,
     utils: str | None = None,
     directives: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build request data dictionary from parameters."""
-    # Convert simple component dict to ComponentDefinition
+    # Convert simple component dict to Component
     if components is not None:
         if all(isinstance(v, str) for v in components.values()):
-            components = ComponentDefinition.from_dict(components)  # type: ignore
+            components = Component.from_dict(components)  # type: ignore
 
     result: dict[str, Any] = {"mdx": mdx, "minify": minify}
     if utils is not None:
@@ -247,7 +247,7 @@ class Renderer:
     def html(
         self,
         mdx: dict[str, str],
-        components: dict[str, ComponentDefinition] | dict[str, str] | None = None,
+        components: dict[str, Component] | dict[str, str] | None = None,
         minify: bool = True,
         utils: str | None = None,
         directives: list[str] | None = None,
@@ -271,7 +271,7 @@ class Renderer:
     def javascript(
         self,
         mdx: dict[str, str],
-        components: dict[str, ComponentDefinition] | dict[str, str] | None = None,
+        components: dict[str, Component] | dict[str, str] | None = None,
         minify: bool = True,
         utils: str | None = None,
         directives: list[str] | None = None,
@@ -295,7 +295,7 @@ class Renderer:
     def schema(
         self,
         mdx: dict[str, str],
-        components: dict[str, ComponentDefinition] | dict[str, str] | None = None,
+        components: dict[str, Component] | dict[str, str] | None = None,
         minify: bool = True,
         utils: str | None = None,
         directives: list[str] | None = None,
@@ -319,7 +319,7 @@ class Renderer:
     def json(
         self,
         mdx: dict[str, str],
-        components: dict[str, ComponentDefinition] | dict[str, str] | None = None,
+        components: dict[str, Component] | dict[str, str] | None = None,
         minify: bool = True,
         utils: str | None = None,
         directives: list[str] | None = None,
@@ -342,9 +342,9 @@ class Renderer:
 
     def render(
         self,
-        output: OutputFormat,
+        output: Output,
         mdx: dict[str, str],
-        components: dict[str, ComponentDefinition] | dict[str, str] | None = None,
+        components: dict[str, Component] | dict[str, str] | None = None,
         minify: bool = True,
         utils: str | None = None,
         directives: list[str] | None = None,
@@ -388,6 +388,6 @@ __all__ = [
     "Input",
     "Result",
     "FileResult",
-    "ComponentDefinition",
-    "OutputFormat",
+    "Component",
+    "Output",
 ]

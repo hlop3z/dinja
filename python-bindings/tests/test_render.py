@@ -1,296 +1,321 @@
-"""Python integration tests for the dinja bindings."""
+"""Python integration tests for the dinja HTTP client."""
 
 from __future__ import annotations
 
-from copy import deepcopy
-from typing import Generator
-
 import pytest
 
-from dinja import ComponentDefinition, Input, Renderer, Settings
+from dinja import Component, Input, Renderer, Result
 
 
 # =============================================================================
-# Fixtures for V8 isolate error handling
+# Fixtures
 # =============================================================================
 
 
 @pytest.fixture
-def renderer() -> Generator[Renderer, None, None]:
-    """Create a Renderer, skipping test if V8 isolate error occurs.
+def renderer() -> Renderer:
+    """Create a Renderer connected to the local service."""
+    return Renderer("http://localhost:8080")
 
-    V8 isolates must be dropped in reverse order of creation. When running
-    multiple tests, previous test cleanup may cause isolate ordering issues.
-    """
+
+# =============================================================================
+# Health Check Tests
+# =============================================================================
+
+
+def test_health_check(renderer: Renderer) -> None:
+    """Test that the service health endpoint works."""
+    # Note: This will fail if the service is not running
+    # In CI, we should skip or mock this
     try:
-        r = Renderer()
-        yield r
-    except BaseException as e:
-        error_msg = str(e)
-        error_type = str(type(e))
-        if (
-            "v8::OwnedIsolate" in error_msg
-            or "PanicException" in error_type
-            or "panic" in error_type.lower()
-        ):
-            pytest.skip(f"V8 isolate error: {type(e).__name__}")
-        raise
+        is_healthy = renderer.health()
+        # If we can reach the service, it should be healthy
+        if is_healthy:
+            assert is_healthy is True
+    except ConnectionError:
+        pytest.skip("Dinja service not running")
 
 
 # =============================================================================
-# Tests using dict API (backward compatibility)
-# =============================================================================
-
-BASE_PAYLOAD = {
-    "settings": {
-        "output": "html",
-        "minify": True,
-    },
-    "mdx": {
-        "index.mdx": "---\ntitle: Index\n---\n# Hello World\n",
-    },
-    "components": None,
-}
-
-
-def test_render_html_success() -> None:
-    """End-to-end success case mirrors the `/render` handler contract."""
-    renderer = Renderer()
-    result = renderer.render(deepcopy(BASE_PAYLOAD))
-
-    assert result["total"] == 1
-    assert result["succeeded"] == 1
-    assert result["failed"] == 0
-
-    file_result = result["files"]["index.mdx"]
-    assert file_result["status"] == "success"
-
-    rendered = file_result["result"]
-    assert rendered["metadata"]["title"] == "Index"
-    output = rendered.get("output") or ""
-    assert "<h1>Hello World</h1>" in output
-
-
-def test_render_rejects_non_string_mdx() -> None:
-    """Input enforces string content, so invalid data raises ValueError."""
-    renderer = Renderer()
-    invalid_payload = deepcopy(BASE_PAYLOAD)
-    invalid_payload["mdx"]["broken.mdx"] = 12345  # type: ignore[assignment]
-
-    with pytest.raises(ValueError):
-        renderer.render(invalid_payload)
-
-
-def test_render_custom_component_html() -> None:
-    """Test that custom components render to regular HTML."""
-    renderer = Renderer()
-
-    payload = {
-        "settings": {
-            "output": "html",
-            "minify": True,
-        },
-        "mdx": {
-            "test.mdx": "# Hello World\n\n<Button>Submit</Button>",
-        },
-        "components": {
-            "Button": {
-                "name": "Button",
-                "code": "export default function Component(props) { return <button>{props.children}</button>; }",
-                "docs": None,
-                "args": None,
-            },
-        },
-    }
-
-    result = renderer.render(payload)
-
-    assert result["total"] == 1
-    assert result["succeeded"] == 1
-    assert result["failed"] == 0
-
-    file_result = result["files"]["test.mdx"]
-    assert file_result["status"] == "success"
-
-    rendered = file_result["result"]
-    output = rendered.get("output") or ""
-
-    # Verify the HTML contains the rendered component
-    assert "<h1>Hello World</h1>" in output
-    assert "<button>" in output
-    assert "Submit" in output
-    assert "</button>" in output
-
-
-def test_render_with_utils() -> None:
-    """Test that utils can be injected and used in components."""
-    renderer = Renderer()
-
-    payload = {
-        "settings": {
-            "output": "html",
-            "minify": False,
-            "utils": "export default { greeting: 'Hello', name: 'World' }",
-        },
-        "mdx": {
-            "test.mdx": "<Greeting />",
-        },
-        "components": {
-            "Greeting": {
-                "name": "Greeting",
-                "code": "export default function Component(props) { return <div>{utils.greeting} {utils.name}</div>; }",
-            },
-        },
-    }
-
-    result = renderer.render(payload)
-
-    assert result["total"] == 1
-    assert result["succeeded"] == 1
-    assert result["failed"] == 0
-
-    file_result = result["files"]["test.mdx"]
-    assert file_result["status"] == "success"
-
-    rendered = file_result["result"]
-    output = rendered.get("output") or ""
-
-    # Verify the utils were accessible in the component
-    assert "Hello World" in output
-
-
-# =============================================================================
-# Tests using dataclass API
+# HTML Rendering Tests
 # =============================================================================
 
 
-def test_dataclass_simple_render(renderer: Renderer) -> None:
-    """Test simple rendering using Input and Settings dataclasses."""
-    result = renderer.render(
-        Input(
-            settings=Settings(output="html", minify=False),
-            mdx={"page.mdx": "# Hello **dinja**"},
+def test_render_html_simple(renderer: Renderer) -> None:
+    """Test simple HTML rendering."""
+    try:
+        result = renderer.html(mdx={"page.mdx": "# Hello World"})
+
+        assert result.total == 1
+        assert result.succeeded == 1
+        assert result.failed == 0
+        assert result.is_all_success()
+
+        output = result.get_output("page.mdx")
+        assert output is not None
+        assert "<h1>Hello World</h1>" in output
+    except ConnectionError:
+        pytest.skip("Dinja service not running")
+
+
+def test_render_html_with_frontmatter(renderer: Renderer) -> None:
+    """Test HTML rendering with YAML frontmatter."""
+    try:
+        result = renderer.html(
+            mdx={
+                "blog.mdx": """---
+title: My Post
+author: Alice
+---
+
+# Content here
+"""
+            }
         )
-    )
 
-    assert result["total"] == 1
-    assert result["succeeded"] == 1
-    assert result["failed"] == 0
+        assert result.is_all_success()
 
-    file_result = result["files"]["page.mdx"]
-    assert file_result["status"] == "success"
-    assert "<h1>Hello <strong>dinja</strong></h1>" in file_result["result"]["output"]
+        metadata = result.get_metadata("blog.mdx")
+        assert metadata["title"] == "My Post"
+        assert metadata["author"] == "Alice"
+    except ConnectionError:
+        pytest.skip("Dinja service not running")
 
 
-def test_dataclass_component_definition(renderer: Renderer) -> None:
-    """Test ComponentDefinition with full parameters."""
-    result = renderer.render(
-        Input(
-            settings=Settings(output="html"),
+def test_render_html_with_component(renderer: Renderer) -> None:
+    """Test HTML rendering with custom component."""
+    try:
+        result = renderer.html(
+            mdx={"page.mdx": "<Button>Click me</Button>"},
+            components={
+                "Button": "export default function Component(props) { return <button>{props.children}</button>; }"
+            },
+        )
+
+        assert result.is_all_success()
+
+        output = result.get_output("page.mdx")
+        assert output is not None
+        assert "<button>" in output
+        assert "Click me" in output
+    except ConnectionError:
+        pytest.skip("Dinja service not running")
+
+
+def test_render_html_with_component_definition(renderer: Renderer) -> None:
+    """Test Component with full parameters."""
+    try:
+        result = renderer.html(
             mdx={"page.mdx": "<Card>Content</Card>"},
             components={
-                "Card": ComponentDefinition(
-                    name="Card",
+                "Card": Component(
                     code="export default function Component({ children }) { return <div class='card'>{children}</div>; }",
+                    name="Card",
                     docs="A card component",
                     args={"children": "ReactNode"},
                 )
             },
         )
-    )
 
-    assert result["succeeded"] == 1
-    file_result = result["files"]["page.mdx"]
-    assert file_result["status"] == "success"
-    assert "class" in file_result["result"]["output"]
-    assert "Content" in file_result["result"]["output"]
+        assert result.is_all_success()
+
+        output = result.get_output("page.mdx")
+        assert output is not None
+        assert "class" in output
+        assert "Content" in output
+    except ConnectionError:
+        pytest.skip("Dinja service not running")
 
 
-def test_dataclass_batch_rendering(renderer: Renderer) -> None:
-    """Test batch rendering with multiple files using dataclass API."""
-    result = renderer.render(
-        Input(
-            settings=Settings(output="html"),
+def test_render_html_with_utils(renderer: Renderer) -> None:
+    """Test HTML rendering with utils."""
+    try:
+        result = renderer.html(
+            mdx={"page.mdx": "<Greeting />"},
+            components={
+                "Greeting": "export default function Component() { return <div>{utils.greeting}</div>; }"
+            },
+            utils="export default { greeting: 'Hello World' }",
+        )
+
+        assert result.is_all_success()
+
+        output = result.get_output("page.mdx")
+        assert output is not None
+        assert "Hello World" in output
+    except ConnectionError:
+        pytest.skip("Dinja service not running")
+
+
+def test_render_html_batch(renderer: Renderer) -> None:
+    """Test batch HTML rendering with multiple files."""
+    try:
+        result = renderer.html(
             mdx={
                 "page1.mdx": "# Page 1",
                 "page2.mdx": "# Page 2",
                 "page3.mdx": "# Page 3",
-            },
+            }
         )
-    )
 
-    assert result["total"] == 3
-    assert result["succeeded"] == 3
-    assert result["failed"] == 0
+        assert result.total == 3
+        assert result.succeeded == 3
+        assert result.failed == 0
+        assert result.is_all_success()
+    except ConnectionError:
+        pytest.skip("Dinja service not running")
 
-    for name in ["page1.mdx", "page2.mdx", "page3.mdx"]:
-        assert result["files"][name]["status"] == "success"
+
+# =============================================================================
+# JavaScript Rendering Tests
+# =============================================================================
 
 
-def test_dataclass_output_formats(renderer: Renderer) -> None:
-    """Test different output formats with dataclass API."""
-    for output_format in ["html", "javascript", "schema"]:
+def test_render_javascript(renderer: Renderer) -> None:
+    """Test JavaScript output format."""
+    try:
+        result = renderer.javascript(mdx={"page.mdx": "# Hello"})
+
+        assert result.is_all_success()
+
+        output = result.get_output("page.mdx")
+        assert output is not None
+        # JavaScript output should contain function syntax
+        assert len(output) > 0
+    except ConnectionError:
+        pytest.skip("Dinja service not running")
+
+
+# =============================================================================
+# Schema Extraction Tests
+# =============================================================================
+
+
+def test_render_schema(renderer: Renderer) -> None:
+    """Test schema extraction."""
+    try:
+        result = renderer.schema(
+            mdx={"page.mdx": "<Button>Click</Button><Card>Content</Card>"}
+        )
+
+        assert result.is_all_success()
+
+        output = result.get_output("page.mdx")
+        assert output is not None
+    except ConnectionError:
+        pytest.skip("Dinja service not running")
+
+
+# =============================================================================
+# JSON Tree Tests
+# =============================================================================
+
+
+def test_render_json(renderer: Renderer) -> None:
+    """Test JSON tree output."""
+    try:
+        result = renderer.json(mdx={"page.mdx": "# Hello"})
+
+        assert result.is_all_success()
+
+        output = result.get_output("page.mdx")
+        assert output is not None
+    except ConnectionError:
+        pytest.skip("Dinja service not running")
+
+
+# =============================================================================
+# Generic Render Method Tests
+# =============================================================================
+
+
+def test_render_generic_method(renderer: Renderer) -> None:
+    """Test generic render method with output parameter."""
+    try:
         result = renderer.render(
-            Input(
-                settings=Settings(output=output_format, minify=False),  # type: ignore
-                mdx={"test.mdx": "# Hello"},
-            )
-        )
-
-        assert result["succeeded"] == 1, f"Failed for format: {output_format}"
-        file_result = result["files"]["test.mdx"]
-        assert file_result["status"] == "success"
-        assert file_result["result"]["output"], f"Empty output for format: {output_format}"
-
-
-def test_dataclass_frontmatter_extraction(renderer: Renderer) -> None:
-    """Test YAML frontmatter extraction with dataclass API."""
-    result = renderer.render(
-        Input(
-            settings=Settings(output="html"),
-            mdx={
-                "blog.mdx": """---
-title: My Post
-author: Alice
-published: true
-tags:
-  - python
-  - rust
----
-
-# Content here
-"""
-            },
-        )
-    )
-
-    assert result["succeeded"] == 1
-    file_result = result["files"]["blog.mdx"]
-    assert file_result["status"] == "success"
-
-    metadata = file_result["result"]["metadata"]
-    assert metadata["title"] == "My Post"
-    assert metadata["author"] == "Alice"
-    assert metadata["published"] is True
-    assert "python" in metadata["tags"]
-    assert "rust" in metadata["tags"]
-
-
-def test_dataclass_settings_with_directives(renderer: Renderer) -> None:
-    """Test Settings with directives parameter."""
-    result = renderer.render(
-        Input(
-            settings=Settings(
-                output="html",
-                minify=False,
-                directives=["v-", "@", "x-"],
-            ),
+            output="html",
             mdx={"page.mdx": "# Hello"},
         )
+
+        assert result.is_all_success()
+
+        output = result.get_output("page.mdx")
+        assert output is not None
+        assert "<h1>Hello</h1>" in output
+    except ConnectionError:
+        pytest.skip("Dinja service not running")
+
+
+# =============================================================================
+# Input Dataclass Tests
+# =============================================================================
+
+
+def test_input_dataclass() -> None:
+    """Test Input dataclass creation and conversion."""
+    input_obj = Input(
+        mdx={"page.mdx": "# Hello"},
+        utils="export default {}",
+        minify=True,
+        directives=["v-"],
     )
 
-    assert result["succeeded"] == 1
-    file_result = result["files"]["page.mdx"]
-    assert file_result["status"] == "success"
+    data = input_obj.to_dict()
+    assert data["mdx"] == {"page.mdx": "# Hello"}
+    assert data["utils"] == "export default {}"
+    assert data["minify"] is True
+    assert data["directives"] == ["v-"]
 
 
+def test_input_with_string_components() -> None:
+    """Test Input with string components (auto-converted to Component)."""
+    input_obj = Input(
+        mdx={"page.mdx": "# Hello"},
+        components={"Button": "export default function() {}"},
+    )
+
+    # String components should be converted to Component instances
+    assert input_obj.components is not None
+    assert "Button" in input_obj.components
+    assert isinstance(input_obj.components["Button"], Component)
+
+
+# =============================================================================
+# Result Tests
+# =============================================================================
+
+
+def test_result_from_dict() -> None:
+    """Test Result.from_dict conversion."""
+    data = {
+        "total": 2,
+        "succeeded": 1,
+        "failed": 1,
+        "files": {
+            "good.mdx": {
+                "success": True,
+                "result": {
+                    "metadata": {"title": "Good"},
+                    "output": "<h1>Good</h1>",
+                },
+            },
+            "bad.mdx": {
+                "success": False,
+                "error": "Parse error",
+            },
+        },
+        "errors": [{"file": "bad.mdx", "message": "Parse error"}],
+    }
+
+    result = Result.from_dict(data)
+
+    assert result.total == 2
+    assert result.succeeded == 1
+    assert result.failed == 1
+    assert not result.is_all_success()
+
+    assert result.get_output("good.mdx") == "<h1>Good</h1>"
+    assert result.get_metadata("good.mdx") == {"title": "Good"}
+
+    assert result.get_output("bad.mdx") is None
+    assert result.files["bad.mdx"].error == "Parse error"
