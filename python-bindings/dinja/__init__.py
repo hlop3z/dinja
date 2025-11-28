@@ -382,9 +382,18 @@ class Renderer:
             return False
 
 
+# Lazy import for async client (to avoid import errors if no async lib installed)
+def __getattr__(name: str) -> type:
+    if name == "AsyncRenderer":
+        from .async_client import AsyncRenderer
+        return AsyncRenderer
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 # Export all public types and classes
 __all__ = [
     "Renderer",
+    "AsyncRenderer",
     "Input",
     "Result",
     "FileResult",

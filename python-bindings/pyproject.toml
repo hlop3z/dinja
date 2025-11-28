@@ -19,6 +19,10 @@ authors = [
 ]
 license = { text = "BSD-3-Clause" }
 
+[project.optional-dependencies]
+httpx = ["httpx>=0.25.0"]
+aiohttp = ["aiohttp>=3.9.0"]
+
 [project.urls]
 Homepage = "https://github.com/hlop3z/dinja"
 Documentation = "https://github.com/hlop3z/dinja#readme"
