@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	dinja "github.com/piny4man/dinja-go"
+	dinja "github.com/hlop3z/dinja/clients/go"
 )
 
 func TestNew(t *testing.T) {
