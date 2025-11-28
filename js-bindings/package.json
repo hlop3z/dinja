@@ -1,6 +1,6 @@
 {
   "name": "@dinja/core",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Fast MDX renderer with component support - JavaScript bindings",
   "main": "wrapper.js",
   "types": "index.d.ts",
