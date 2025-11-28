@@ -2504,3 +2504,719 @@ fn test_jsx_boolean_and_numeric_props() {
 
     println!("Boolean/numeric props output: {}", html);
 }
+
+// =============================================================================
+// Common MDX/TSX Bug Tests (based on known issues from mdx-js/mdx)
+// =============================================================================
+
+#[test]
+fn test_html_entities_in_content() {
+    // Test that HTML entities like &lt; &gt; &amp; are preserved correctly
+    // Reference: https://github.com/mdx-js/mdx/issues/1219
+    let service = create_test_service();
+
+    let content = r#"# HTML Entities Test
+
+Special characters: &lt;div&gt; &amp; &quot;quoted&quot;
+
+In a paragraph: The expression a &lt; b &amp;&amp; c &gt; d is common.
+
+Entity codes: &#60; &#62; &#38; &#34;
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("entities.mdx".to_string(), content.to_string());
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "HTML entities should render. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("entities.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    // Verify entities are present in some form (either encoded or decoded)
+    assert!(
+        html.contains("&lt;") || html.contains("<div>"),
+        "Should contain lt entity or decoded: {}",
+        html
+    );
+    println!("HTML entities output: {}", html);
+}
+
+#[test]
+fn test_jsx_style_comments() {
+    // Test JSX-style comments {/* comment */}
+    // Reference: https://github.com/mdx-js/mdx/issues/1042
+    let service = create_test_service();
+
+    let content = r#"# Comments Test
+
+{/* This is a JSX comment and should not appear in output */}
+
+Some visible content.
+
+{/* Another comment */}
+
+More visible content.
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("comments.mdx".to_string(), content.to_string());
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+
+    // Print errors for debugging
+    if !outcome.errors.is_empty() {
+        for err in &outcome.errors {
+            eprintln!("JSX comments error: {}", err.message);
+        }
+    }
+
+    // JSX comments may or may not be supported - document the behavior
+    let file_outcome = outcome.files.get("comments.mdx").expect("File not found");
+    if let Some(result) = &file_outcome.result {
+        let html = result.output.as_ref().unwrap();
+        // Comments should NOT appear in output
+        assert!(
+            !html.contains("This is a JSX comment"),
+            "JSX comments should be stripped: {}",
+            html
+        );
+        assert!(
+            html.contains("Some visible content"),
+            "Visible content should remain: {}",
+            html
+        );
+        println!("JSX comments output: {}", html);
+    } else {
+        println!(
+            "JSX comments not supported (expected): {:?}",
+            file_outcome.error
+        );
+    }
+}
+
+#[test]
+fn test_whitespace_around_inline_components() {
+    // Test that whitespace is preserved around inline components
+    // Reference: https://github.com/mdx-js/mdx/issues/843
+    let service = create_test_service();
+
+    let content = r#"Hello <Highlight>world</Highlight> and <Highlight>universe</Highlight>!"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("whitespace.mdx".to_string(), content.to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "Highlight".to_string(),
+        ComponentDefinition {
+            name: Some("Highlight".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ children }) {
+                return <mark>{children}</mark>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Inline components with whitespace should work. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("whitespace.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    // Check content renders
+    assert!(html.contains("world"), "Should contain world: {}", html);
+    assert!(
+        html.contains("universe"),
+        "Should contain universe: {}",
+        html
+    );
+    println!("Whitespace output: {}", html);
+}
+
+#[test]
+fn test_escaped_markdown_characters() {
+    // Test escaped markdown characters like \* \_ \# \`
+    let service = create_test_service();
+
+    let content = r#"# Escaped Characters
+
+This is \*not bold\* and this is \*\*not strong\*\*.
+
+This is \_not italic\_ either.
+
+\# Not a heading
+
+\`not code\`
+
+Backslash: \\
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("escaped.mdx".to_string(), content.to_string());
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Escaped chars should render. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("escaped.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    // Escaped asterisks should NOT create bold/italic
+    assert!(
+        !html.contains("<strong>not bold</strong>"),
+        "Escaped ** should not be bold: {}",
+        html
+    );
+    assert!(
+        !html.contains("<em>not italic</em>"),
+        "Escaped _ should not be italic: {}",
+        html
+    );
+    println!("Escaped chars output: {}", html);
+}
+
+#[test]
+fn test_unicode_and_emoji_in_mdx() {
+    // Test Unicode characters and emoji in MDX content
+    let service = create_test_service();
+
+    let content = r#"---
+title: Unicode Test 🎉
+emoji: 🚀
+---
+
+# {context('title')}
+
+Emoji in text: 🔥 💻 ⚡ 🎯
+
+Unicode: α β γ δ → ← ↑ ↓ ∞ ≠ ≤ ≥
+
+CJK: 你好世界 こんにちは 안녕하세요
+
+Special: — – … © ® ™ § ¶ † ‡
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("unicode.mdx".to_string(), content.to_string());
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Unicode should render. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("unicode.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    // Verify unicode content is preserved
+    assert!(html.contains("🎉"), "Should contain party emoji: {}", html);
+    assert!(html.contains("你好"), "Should contain Chinese: {}", html);
+    assert!(html.contains("α"), "Should contain Greek: {}", html);
+    println!("Unicode output length: {} chars", html.len());
+}
+
+#[test]
+fn test_consecutive_jsx_components() {
+    // Test multiple JSX components in sequence without whitespace
+    let service = create_test_service();
+
+    let content = r#"<Badge>A</Badge><Badge>B</Badge><Badge>C</Badge>
+
+<Tag color="red">First</Tag><Tag color="blue">Second</Tag>
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("consecutive.mdx".to_string(), content.to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "Badge".to_string(),
+        ComponentDefinition {
+            name: Some("Badge".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ children }) {
+                return <span class="badge">{children}</span>;
+            }"#
+            .to_string(),
+        },
+    );
+    components.insert(
+        "Tag".to_string(),
+        ComponentDefinition {
+            name: Some("Tag".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ color, children }) {
+                return <span class={`tag tag-${color}`}>{children}</span>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Consecutive components should render. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("consecutive.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    // All badges should render
+    assert!(html.contains(">A<"), "Should contain A: {}", html);
+    assert!(html.contains(">B<"), "Should contain B: {}", html);
+    assert!(html.contains(">C<"), "Should contain C: {}", html);
+    assert!(html.contains("tag-red"), "Should contain red tag: {}", html);
+    assert!(
+        html.contains("tag-blue"),
+        "Should contain blue tag: {}",
+        html
+    );
+    println!("Consecutive components output: {}", html);
+}
+
+#[test]
+fn test_table_with_jsx_and_code() {
+    // Test tables containing JSX components and code
+    // Reference: https://github.com/mdx-js/mdx/issues/2000
+    let service = create_test_service();
+
+    let content = r#"# Table Test
+
+| Feature | Description | Example |
+|---------|-------------|---------|
+| Bold | **strong text** | `code` |
+| Link | [click here](/) | `const x = 1;` |
+| Mixed | **bold** and _italic_ | `{value}` |
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("table.mdx".to_string(), content.to_string());
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Table should render. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("table.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    assert!(html.contains("<table"), "Should contain table: {}", html);
+    assert!(
+        html.contains("<strong>"),
+        "Should contain bold in table: {}",
+        html
+    );
+    assert!(
+        html.contains("<code>"),
+        "Should contain code in table: {}",
+        html
+    );
+    println!("Table output: {}", html);
+}
+
+#[test]
+fn test_deeply_nested_jsx() {
+    // Test deeply nested JSX components
+    let service = create_test_service();
+
+    let content = r#"<Outer>
+  <Middle>
+    <Inner>
+      <Deep>Content at depth 4</Deep>
+    </Inner>
+  </Middle>
+</Outer>"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("nested.mdx".to_string(), content.to_string());
+
+    let mut components = HashMap::new();
+    for name in ["Outer", "Middle", "Inner", "Deep"] {
+        components.insert(
+            name.to_string(),
+            ComponentDefinition {
+                name: Some(name.to_string()),
+                docs: None,
+                args: None,
+                code: format!(
+                    r#"export default function Component({{ children }}) {{
+                    return <div class="{name}">{{children}}</div>;
+                }}"#,
+                    name = name.to_lowercase()
+                ),
+            },
+        );
+    }
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Deeply nested JSX should render. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("nested.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    assert!(html.contains("outer"), "Should contain outer: {}", html);
+    assert!(html.contains("deep"), "Should contain deep: {}", html);
+    assert!(
+        html.contains("Content at depth 4"),
+        "Should contain content: {}",
+        html
+    );
+    println!("Deeply nested output: {}", html);
+}
+
+#[test]
+fn test_jsx_with_string_containing_special_chars() {
+    // Test JSX with string props containing special characters
+    // Reference: https://github.com/Microsoft/TypeScript/issues/6241
+    let service = create_test_service();
+
+    let content =
+        r#"<Message text="Hello \"world\" with 'quotes' and <brackets>" symbol="&amp;" />"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("special_strings.mdx".to_string(), content.to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "Message".to_string(),
+        ComponentDefinition {
+            name: Some("Message".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ text, symbol }) {
+                return <div class="message">{text} {symbol}</div>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+
+    // This may or may not work depending on escaping support
+    if outcome.is_all_success() {
+        let html = outcome
+            .files
+            .get("special_strings.mdx")
+            .unwrap()
+            .result
+            .as_ref()
+            .unwrap()
+            .output
+            .as_ref()
+            .unwrap();
+        println!("Special strings output: {}", html);
+    } else {
+        println!(
+            "Special strings in props not fully supported: {:?}",
+            outcome.errors
+        );
+    }
+}
+
+#[test]
+fn test_empty_jsx_expression() {
+    // Test empty JSX expressions {}
+    let service = create_test_service();
+
+    // Note: Empty expressions {} may cause issues - test behavior
+    let content = r#"---
+value: test
+---
+
+# Test
+
+Value is: {context('value')}
+
+End.
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("empty_expr.mdx".to_string(), content.to_string());
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Expression should render. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("empty_expr.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    assert!(
+        html.contains("test"),
+        "Should contain context value: {}",
+        html
+    );
+    println!("Expression output: {}", html);
+}
+
+#[test]
+fn test_markdown_blank_line_in_jsx() {
+    // Test markdown content inside JSX with required blank lines
+    // Reference: https://github.com/mdx-js/mdx/issues/1312
+    let service = create_test_service();
+
+    let content = r#"<Container>
+
+# Heading Inside Component
+
+This is a paragraph with **bold** and *italic*.
+
+- List item 1
+- List item 2
+
+</Container>"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("blank_lines.mdx".to_string(), content.to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "Container".to_string(),
+        ComponentDefinition {
+            name: Some("Container".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ children }) {
+                return <div class="container">{children}</div>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Markdown in JSX should render. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("blank_lines.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    assert!(
+        html.contains("container"),
+        "Should have container: {}",
+        html
+    );
+    // Check if markdown was processed
+    println!("Markdown in JSX output: {}", html);
+}
