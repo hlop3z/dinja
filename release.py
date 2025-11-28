@@ -21,6 +21,12 @@ Commands:
              GitHub Actions release workflow (same behavior as the former shell
              script). Versions must already be updated and committed.
               uv run release.py release 0.3.0
+
+  * commit: stage all changes and commit with a message or UUID.
+          Examples:
+              uv run release.py commit -m "fix: something"        # with message
+              uv run release.py commit --uuid                     # use generated UUID
+              uv run release.py commit                            # interactive prompt
 """
 
 from __future__ import annotations
@@ -31,6 +37,7 @@ import re
 import shutil
 import subprocess
 import sys
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Dict, Iterable, Optional
@@ -587,6 +594,75 @@ def release(
     run_cmd(["git", "push", "origin", tag], debug=debug)
     if debug:
         print("[DEBUG] Release completed successfully")
+
+
+@app.command(help="Stage all changes and commit with a message (or generate UUID).")
+def commit(
+    message: Annotated[
+        str | None,
+        Parameter(
+            name=["--message", "-m"],
+            help="Commit message. If not provided, prompts for UUID or custom message.",
+        ),
+    ] = None,
+    use_uuid: Annotated[
+        bool,
+        Parameter(
+            name=["--uuid", "-u"],
+            help="Use a generated UUID as the commit message.",
+        ),
+    ] = False,
+    debug: Annotated[
+        bool, Parameter(help="Enable debug output with verbose logging.")
+    ] = False,
+) -> None:
+    if debug:
+        print("[DEBUG] Commit operation starting...")
+        print(f"[DEBUG] message: {message!r}")
+        print(f"[DEBUG] use_uuid: {use_uuid}")
+
+    # Check if there are changes to commit
+    try:
+        result = subprocess.check_output(
+            ["git", "status", "--porcelain"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+        if not result:
+            print("No changes to commit.")
+            return
+        if debug:
+            print(f"[DEBUG] Changes detected:\n{result}")
+    except subprocess.CalledProcessError as exc:
+        raise ReleaseError("Failed to check git status.") from exc
+
+    # Determine commit message
+    if message:
+        commit_msg = message
+    elif use_uuid:
+        commit_msg = str(uuid.uuid4())
+        print(f"Generated UUID: {commit_msg}")
+    else:
+        # Interactive prompt
+        print("\nChanges to commit:")
+        print(result)
+        print("\nCommit message options:")
+        print("  [1] Generate UUID")
+        print("  [2] Enter custom message")
+        choice = input("\nSelect option (1/2): ").strip()
+
+        if choice == "1":
+            commit_msg = str(uuid.uuid4())
+            print(f"Generated UUID: {commit_msg}")
+        elif choice == "2":
+            commit_msg = input("Enter commit message: ").strip()
+            if not commit_msg:
+                raise ReleaseError("Commit message cannot be empty.")
+        else:
+            raise ReleaseError(f"Invalid option: {choice}")
+
+    # Stage all changes and commit
+    run_cmd(["git", "add", "-A"], debug=debug)
+    run_cmd(["git", "commit", "-m", commit_msg], debug=debug)
+    print(f"Committed with message: {commit_msg}")
 
 
 def main(argv: Optional[Iterable[str]] = None) -> None:

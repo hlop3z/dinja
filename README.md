@@ -17,12 +17,12 @@ Safe, deterministic MDX rendering powered by a Rust HTTP service with Python and
 
 ## Links
 
-- [Read the Docs](https://hlop3z.github.io/dinja)
+- [Documentation](https://hlop3z.github.io/dinja)
 - [GitHub](https://github.com/hlop3z/dinja)
-- [PyPI](https://pypi.org/project/dinja)
-- [npm](https://www.npmjs.com/package/@dinja/core)
 - [Crates.io](https://crates.io/crates/dinja-core)
 - [Docker](https://github.com/hlop3z/dinja/pkgs/container/dinja)
+- [PyPI](https://pypi.org/project/dinja)
+- [NPM](https://www.npmjs.com/package/@dinja/core)
 
 ## Quick Start
 
@@ -35,9 +35,9 @@ docker run -p 8080:8080 ghcr.io/hlop3z/dinja:latest
 
 ### 2. Install a Client
 
-| Target     | Command               |
-| ---------- | --------------------- |
-| Python     | `pip install dinja`   |
+| Target     | Command                   |
+| ---------- | ------------------------- |
+| Python     | `pip install dinja`       |
 | TypeScript | `npm install @dinja/core` |
 
 ### 3. Render MDX
@@ -60,15 +60,15 @@ print(result.get_output("page.mdx"))
 **TypeScript:**
 
 ```typescript
-import { Renderer, getOutput } from '@dinja/core';
+import { Renderer, getOutput } from "@dinja/core";
 
-const renderer = new Renderer({ baseUrl: 'http://localhost:8080' });
+const renderer = new Renderer({ baseUrl: "http://localhost:8080" });
 
 const result = await renderer.html({
-    views: { 'page.mdx': '# Hello **World**' },
+  views: { "page.mdx": "# Hello **World**" },
 });
 
-console.log(getOutput(result, 'page.mdx'));
+console.log(getOutput(result, "page.mdx"));
 // Output: <h1>Hello <strong>World</strong></h1>
 ```
 
@@ -100,10 +100,11 @@ result = renderer.html(
 
 ```typescript
 const result = await renderer.html({
-    views: { 'app.mdx': '# App\n\n<Button>Click me</Button>' },
-    components: {
-        Button: 'export default function Component(props) { return <button>{props.children}</button>; }',
-    },
+  views: { "app.mdx": "# App\n\n<Button>Click me</Button>" },
+  components: {
+    Button:
+      "export default function Component(props) { return <button>{props.children}</button>; }",
+  },
 });
 ```
 
