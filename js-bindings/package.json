@@ -1,6 +1,6 @@
 {
   "name": "@dinja/core",
-  "version": "0.4.4",
+  "version": "0.5.0",
   "description": "HTTP client for the Dinja MDX rendering service",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
