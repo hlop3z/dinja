@@ -59,3 +59,8 @@ path = "examples/test_render.rs"
 
 [dev-dependencies]
 proptest = "1.5"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "render_benchmark"
+harness = false
