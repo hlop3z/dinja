@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Dinja is a safe, deterministic MDX (Markdown with JSX) renderer. It has a Rust core (`dinja-core`) with Python bindings (PyO3) and JavaScript bindings (NAPI-rs).
+Dinja is a safe, deterministic MDX (Markdown with JSX) renderer. It has a Rust core (`dinja-core`) that runs as an HTTP service, with Python, JavaScript, and Go HTTP clients.
 
 ## Build Commands
 
@@ -14,22 +14,24 @@ All builds use the centralized script `./utils/build.sh`:
 ./utils/build.sh build           # Build entire Rust workspace (debug)
 ./utils/build.sh build-core      # Build core crate only (no Python needed)
 ./utils/build.sh build-release   # Build workspace (release mode)
-./utils/build.sh build-python    # Build Python wheels via maturin
-./utils/build.sh dev             # Install Python bindings in development mode
 ```
 
-JavaScript bindings (not integrated with build.sh):
+Client builds:
 
 ```bash
-cd js-bindings && npm run build
+cd clients/js && npm run build   # Build JavaScript client
+cd clients/py && uv sync         # Sync Python client dependencies
+cd clients/go && go build ./...  # Build Go client
 ```
 
 ## Test Commands
 
 ```bash
-./utils/build.sh test            # Run Rust + Python tests
-./utils/build.sh test-core       # Run core crate tests only (no Python needed)
-cd js-bindings && npm test       # Run JavaScript tests
+./utils/build.sh test            # Run Rust tests
+./utils/build.sh test-core       # Run core crate tests only
+cd clients/js && npm test        # Run JavaScript tests
+cd clients/py && uv run pytest   # Run Python tests (requires service running)
+cd clients/go && go test ./...   # Run Go tests
 ```
 
 Run a single Rust test:
@@ -41,7 +43,7 @@ cargo test -p dinja-core test_name
 Run a single Python test:
 
 ```bash
-uv run pytest python-bindings/tests/test_render.py::test_name -v
+uv run pytest clients/py/tests/test_render.py::test_name -v
 ```
 
 ## Lint and Format
@@ -49,7 +51,7 @@ uv run pytest python-bindings/tests/test_render.py::test_name -v
 ```bash
 cargo fmt --all -- --check                    # Check formatting
 cargo fmt --all                               # Fix formatting
-cargo clippy -p dinja-core -- -D warnings     # Lint (use -p to avoid Python env issues)
+cargo clippy -p dinja-core -- -D warnings     # Lint
 cargo machete --skip-target-dir               # Check for unused dependencies
 ```
 
@@ -57,9 +59,10 @@ cargo machete --skip-target-dir               # Check for unused dependencies
 
 ### Workspace Structure
 
-- `core/` - Rust core library (`dinja-core` crate)
-- `python-bindings/` - Python bindings via PyO3
-- `js-bindings/` - JavaScript bindings via NAPI-rs
+- `core/` - Rust core library (`dinja-core` crate) and HTTP service
+- `clients/py/` - Python HTTP client
+- `clients/js/` - JavaScript/TypeScript HTTP client
+- `clients/go/` - Go HTTP client
 - `utils/build.sh` - Centralized build orchestration
 
 ### Rendering Pipeline
@@ -73,11 +76,11 @@ MDX Content → Extract YAML Frontmatter (gray_matter) → Markdown to HTML (mar
 
 **Thread-Local Renderer Pool**: Each thread maintains its own cache of JavaScript runtimes because V8 isolates are not Send/Sync. This is managed in `core/src/renderer/pool.rs`.
 
-**Reusable Renderer Instance**: Python and JS bindings expose a `Renderer` class that creates the service once and reuses it across multiple renders, solving V8 isolate cleanup ordering issues.
+**HTTP Service Architecture**: The Rust core runs as an HTTP service. Python, JavaScript, and Go clients communicate with it via HTTP requests.
 
 **Embedded Static Assets**: JavaScript engine code (`engine.min.js`, etc.) is embedded via `include_str!` and extracted to a temp directory on first use. See `core/static/`.
 
-**Resource Limits**: Prevents memory exhaustion with configurable limits (all configurable via `Renderer` constructor in Python/JS):
+**Resource Limits**: Prevents memory exhaustion with configurable limits:
 
 - `max_batch_size`: Default 1000
 - `max_mdx_content_size`: Default 10 MB
@@ -115,11 +118,12 @@ The pre-commit hook runs:
 - Clippy linting (`cargo clippy -p dinja-core`)
 - Core tests (`cargo test -p dinja-core`)
 - Unused dependency check (if `cargo-machete` installed)
-- Python/JS checks (if those bindings are modified)
+- Python/JS/Go checks (if those clients are modified)
 
 ## Requirements
 
 - Rust (stable)
-- Python 3.13+ (for bindings, uses `abi3-py313` feature)
-- Node.js 18+ (for JS bindings)
+- Python 3.13+ (for Python client)
+- Node.js 18+ (for JS client)
+- Go 1.21+ (for Go client)
 - `uv` package manager (Python environment management)

@@ -2,8 +2,10 @@
 
 ## Project layout
 
-- `core/` – Rust crate (`dinja-core`) with the rendering engine.
-- `python-bindings/` – PyO3 wrapper that exposes the engine as the `dinja` Python package.
+- `core/` – Rust crate (`dinja-core`) with the rendering engine and HTTP service.
+- `clients/py/` – Python HTTP client for the dinja package.
+- `clients/js/` – JavaScript/TypeScript HTTP client.
+- `clients/go/` – Go HTTP client.
 - `docs/dev-docs/` – contributor docs (release playbooks, etc.).
 
 ## Local workflow
@@ -15,7 +17,7 @@ cargo fmt --all
 cargo clippy --all-targets --all-features
 cargo test --all-features
 
-cd python-bindings
+cd clients/py
 uv sync --dev
 uv run pytest
 ```

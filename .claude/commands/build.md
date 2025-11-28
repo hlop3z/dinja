@@ -3,7 +3,7 @@
 Build the specified component(s) of the dinja project using the centralized build script.
 
 ## Arguments
-- `$ARGUMENTS` - Component to build: `core`, `python`, `js`, `release`, or `all` (default: all)
+- `$ARGUMENTS` - Component to build: `core`, `python`, `js`, `go`, `release`, or `all` (default: all)
 
 ## Instructions
 
@@ -22,9 +22,9 @@ Build the Rust workspace in release mode:
 ```
 
 ### For `python`:
-Build Python wheels:
+Sync Python client dependencies:
 ```bash
-./utils/build.sh build-python
+cd clients/py && uv sync --dev
 ```
 
 ### For `all` (default):
@@ -34,9 +34,15 @@ Build the entire Rust workspace (falls back to core if Python unavailable):
 ```
 
 ### For `js`:
-JavaScript bindings (not yet integrated with build.sh):
+JavaScript client:
 ```bash
-cd js-bindings && npm run build
+cd clients/js && npm install && npm run build
+```
+
+### For `go`:
+Go client:
+```bash
+cd clients/go && go build ./...
 ```
 
 ## Build Commands Reference
@@ -46,12 +52,13 @@ cd js-bindings && npm run build
 | `./utils/build.sh build-core` | Build core crate only (no Python) |
 | `./utils/build.sh build-release` | Build workspace (release mode) |
 | `./utils/build.sh build-core-release` | Build core (release, no Python) |
-| `./utils/build.sh build-python` | Build Python wheels |
-| `./utils/build.sh dev` | Install Python bindings in dev mode |
+| `./utils/build.sh test` | Run all tests |
+| `./utils/build.sh test-core` | Run core tests only |
+| `./utils/build.sh clean` | Clean build artifacts |
 
 ## Build Order
 When building `all`, the script builds in this order:
-1. Core (Rust library)
-2. Python bindings (if Python available)
+1. Core (Rust library and HTTP service)
+2. Clients are built separately (py, js, go)
 
 Report any build errors clearly and suggest fixes based on the error messages.

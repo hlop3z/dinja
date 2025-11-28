@@ -1,25 +1,21 @@
 # TODO
 
-New system, delete all rust bindings to python and javascript.
+## Completed
 
-Instead they must download the container.
+Renamed client directories and moved to `clients/`:
 
-- `docker pull ghcr.io/hlop3z/dinja:0.4.3`
+- `go-bindings` → `clients/go`
+- `js-bindings` → `clients/js`  
+- `python-bindings` → `clients/py`
 
-Run the rust server and connect to it.
-
-## Python
-
-`from dinja import Renderer, Input`
-
-## Typescript
-
-`import { Renderer, RenderInput, RenderResult } from '@dinja/core';`
-
-also rename imports to
-
-`import { Renderer, Input, Result } from '@dinja/core';`
-
-Remove settings of the service, since now it would be in rust via a docker and not their bindings like before.
-
-Use http in both python and javascript to call the service instead.
+Updated all references in:
+- `.github/workflows/*.yml`
+- `utils/build.sh`
+- `hooks/pre-commit`
+- `release.py`
+- `CLAUDE.md`
+- `.dockerignore`
+- `.dev-ops/*.md`
+- `.claude/commands/*.md`
+- `docs/docs/development/*.md`
+- `clients/*/package.json`, `README.md`, etc.

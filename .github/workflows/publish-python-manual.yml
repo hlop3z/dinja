@@ -30,18 +30,18 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Sync Python dependencies
-        working-directory: python-bindings
+        working-directory: clients/py
         run: uv sync --dev
 
       - name: Build Python distributions
-        working-directory: python-bindings
+        working-directory: clients/py
         run: uv build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: python-dist
-          path: python-bindings/dist/*
+          path: clients/py/dist/*
           if-no-files-found: error
 
   publish-python:

@@ -51,10 +51,12 @@ Dockerfile
 docker-compose.yml
 .dockerignore
 
+# Ignore clients (not needed for server image)
+clients/
+
 # Keep only what's needed for the build
 !core/src/
 !core/Cargo.toml
 !core/static/
-!python-bindings/Cargo.toml
 !Cargo.toml
 !Cargo.lock

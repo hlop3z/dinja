@@ -15,11 +15,13 @@ cargo --version
 uv --version
 node --version
 npm --version
+go version
 ```
 
 Also check:
-- Python virtual environment exists in `python-bindings/.venv`
-- Node modules installed in `js-bindings/node_modules`
+- Python virtual environment exists in `clients/py/.venv`
+- Node modules installed in `clients/js/node_modules`
+- Go module initialized in `clients/go`
 
 ### For `install`:
 Install/update development dependencies:
@@ -29,15 +31,19 @@ Install/update development dependencies:
    rustup update
    ```
 
-2. **Python bindings (using build.sh):**
+2. **Python client:**
    ```bash
-   ./utils/build.sh dev
+   cd clients/py && uv sync --dev
    ```
-   This handles virtualenv creation, maturin installation via uv, and development mode installation.
 
-3. **JavaScript bindings:**
+3. **JavaScript client:**
    ```bash
-   cd js-bindings && npm install
+   cd clients/js && npm install
+   ```
+
+4. **Go client:**
+   ```bash
+   cd clients/go && go mod tidy
    ```
 
 ### For `full`:
@@ -55,13 +61,12 @@ This runs build, test, and dev mode setup in sequence.
 | `./utils/build.sh build-core` | Build core only (no Python) |
 | `./utils/build.sh test` | Run all tests |
 | `./utils/build.sh test-core` | Run core tests only |
-| `./utils/build.sh dev` | Install Python bindings in dev mode |
-| `./utils/build.sh build-python` | Build Python wheels |
 | `./utils/build.sh clean` | Clean build artifacts |
-| `./utils/build.sh all` | Build, test, and install dev mode |
+| `./utils/build.sh all` | Build and test |
 
 ## Required Tools
 - Rust 1.75+ (with cargo)
-- Python 3.13+ (with uv package manager recommended)
-- Node.js 18+ (with npm)
-- uv (https://github.com/astral-sh/uv) - handles maturin and Python env automatically
+- Python 3.13+ (for Python client)
+- Node.js 18+ (for JavaScript client)
+- Go 1.21+ (for Go client)
+- uv (https://github.com/astral-sh/uv) - handles Python env automatically

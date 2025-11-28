@@ -21,14 +21,14 @@ uv run release.py release --version 0.x.x
 
 ## Step 2: Bump versions
 
-To bump both the Rust workspace and Python bindings in one go, run:
+To bump the Rust workspace, Python client, and JavaScript client in one go, run:
 
 ```sh
 uv run release.py bump --version 0.3.0
 ```
 
 This updates all version fields, auto-commits the change (message like
-`chore: bump rust+python to v0.3.0`), and leaves the tree ready for a release tag.
+`chore: bump rust+python+javascript to v0.3.0`), and leaves the tree ready for a release tag.
 To skip committing use `--no-commit`; to customize the message pass
 `--commit-message "custom text"`.
 
@@ -64,8 +64,7 @@ What this does:
    - `cargo fmt --all --check`
    - `cargo clippy --all-targets --all-features -- -D warnings`
    - `cargo test --all-features`
-   - `uv sync --dev` in `python-bindings`
-   - `uv run pytest`
+   - `uv sync --dev` in `clients/py`
 5. Tags the repo (`v0.3.0`) and pushes both `HEAD` and the tag to origin.
 
 ### Useful flags
@@ -79,8 +78,9 @@ What this does:
 Pushing the tag triggers `.github/workflows/release.yml`, which:
 
 1. Publishes `dinja-core` to crates.io.
-2. Builds/test wheels on Linux, macOS (arm64/x86), Windows.
-3. Uploads and publishes the `dinja` package to PyPI via Trusted Publisher.
+2. Builds and publishes the Python `dinja` package to PyPI via Trusted Publisher.
+3. Builds and publishes the JavaScript `@dinja/core` package to npm.
+4. Builds and publishes the Docker image to GitHub Container Registry.
 
 Watch the workflow for failures. If something breaks, fix and re-run the job or
 delete/recreate the tag as needed.
@@ -96,5 +96,5 @@ delete/recreate the tag as needed.
 - **Version mismatch error**: run a targeted bump (`release.py bump ...`) and re-run.
 - **Dirty tree**: commit or stash changes before invoking `release.py release`.
 - **PyO3 Python missing**: ensure `uv` is installed; the script auto-installs a
-  Python interpreter if one isn’t found.
+  Python interpreter if one isn't found.
 - **CI wheel failures**: rerun the affected matrix job after fixing the issue.

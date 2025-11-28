@@ -6,7 +6,8 @@ Instructions for building Dinja from source.
 
 - Rust toolchain (latest stable)
 - Node.js 18+ (for TypeScript client)
-- Python 3.8+ (for Python client)
+- Python 3.13+ (for Python client)
+- Go 1.21+ (for Go client)
 
 ## Building Rust Core
 
@@ -33,7 +34,7 @@ The service runs on `http://localhost:8080` by default.
 ## Building TypeScript Client
 
 ```bash
-cd js-bindings
+cd clients/js
 npm install
 npm run build
 ```
@@ -43,15 +44,22 @@ npm run build
 The Python client is a pure Python HTTP client (no native bindings):
 
 ```bash
-cd python-bindings
+cd clients/py
 pip install -e .
 ```
 
 Or with uv:
 
 ```bash
-cd python-bindings
+cd clients/py
 uv sync
+```
+
+## Building Go Client
+
+```bash
+cd clients/go
+go build ./...
 ```
 
 ## Building Docker Image
@@ -93,7 +101,7 @@ cargo test -p dinja-core
 ### Python Tests
 
 ```bash
-cd python-bindings
+cd clients/py
 # Start service first
 docker run -d -p 8080:8080 ghcr.io/hlop3z/dinja:latest
 
@@ -104,8 +112,15 @@ uv run pytest
 ### TypeScript Tests
 
 ```bash
-cd js-bindings
+cd clients/js
 npm test
+```
+
+### Go Tests
+
+```bash
+cd clients/go
+go test ./...
 ```
 
 ## Release Process
@@ -113,7 +128,6 @@ npm test
 Versions are managed in the `VERSION` file and synced across all packages using `release.py`:
 
 ```bash
-python release.py patch  # Bump patch version
-python release.py minor  # Bump minor version
-python release.py major  # Bump major version
+uv run release.py bump --version 0.3.0  # Bump all versions
+uv run release.py release 0.3.0         # Create release tag
 ```

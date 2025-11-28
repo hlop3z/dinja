@@ -13,21 +13,38 @@ How to run and write tests for Dinja.
 ### Python Tests Only
 
 ```bash
-cd python-bindings
+cd clients/py
+# Start the service first
+docker run -d -p 8080:8080 ghcr.io/hlop3z/dinja:latest
 pytest tests/
 ```
 
 ### Rust Tests Only
 
 ```bash
-cd python-bindings
-cargo test --lib
+cargo test -p dinja-core
+```
+
+### JavaScript Tests Only
+
+```bash
+cd clients/js
+npm test
+```
+
+### Go Tests Only
+
+```bash
+cd clients/go
+go test ./...
 ```
 
 ## Test Structure
 
-- **Python tests**: `python-bindings/tests/`
-- **Rust tests**: `python-bindings/src/lib.rs` (in `#[cfg(test)]` module)
+- **Rust tests**: `core/src/` (in `#[cfg(test)]` modules)
+- **Python tests**: `clients/py/tests/`
+- **JavaScript tests**: `clients/js/test/`
+- **Go tests**: `clients/go/*_test.go`
 
 ## Writing Tests
 
@@ -35,17 +52,12 @@ cargo test --lib
 
 ```python
 def test_basic_render():
-    from dinja import Renderer, Input, Settings
+    from dinja import Renderer
     
     renderer = Renderer()
-    result = renderer.render(
-        Input(
-            mdx={"test.mdx": "# Hello"},
-            settings=Settings(output="html"),
-        )
-    )
+    result = renderer.html(views={"test.mdx": "# Hello"})
     
-    assert result["succeeded"] == 1
+    assert result.succeeded == 1
 ```
 
 ### Rust Test Example
@@ -60,9 +72,25 @@ fn test_basic_render() {
 }
 ```
 
+### Go Test Example
+
+```go
+func TestBasicRender(t *testing.T) {
+    renderer := dinja.New()
+    result, err := renderer.HTML(context.Background(), dinja.Input{
+        Views: map[string]string{"test.mdx": "# Hello"},
+    })
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    if !result.IsAllSuccess() {
+        t.Error("expected all success")
+    }
+}
+```
+
 ## Test Coverage
 
 - Unit tests for core functionality
 - Integration tests for end-to-end scenarios
 - Performance tests for optimization validation
-

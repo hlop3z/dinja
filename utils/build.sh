@@ -90,10 +90,10 @@ test_python() {
         log_info "Service is running at http://localhost:8080"
     fi
 
-    cd python-bindings
+    cd clients/py
     uv sync --dev
     uv run pytest tests
-    cd ..
+    cd ../..
 
     log_info "Python tests completed successfully"
 }
@@ -101,28 +101,46 @@ test_python() {
 # Run JavaScript tests
 test_js() {
     log_info "Running JavaScript tests..."
-    cd js-bindings
+    cd clients/js
     npm test
-    cd ..
+    cd ../..
     log_info "JavaScript tests completed successfully"
+}
+
+# Run Go tests
+test_go() {
+    log_info "Running Go tests..."
+    cd clients/go
+    go test ./...
+    cd ../..
+    log_info "Go tests completed successfully"
 }
 
 # Build JavaScript client
 build_js() {
     log_info "Building JavaScript client..."
-    cd js-bindings
+    cd clients/js
     npm install
     npm run build
-    cd ..
+    cd ../..
     log_info "JavaScript build completed successfully"
+}
+
+# Build Go client
+build_go() {
+    log_info "Building Go client..."
+    cd clients/go
+    go build ./...
+    cd ../..
+    log_info "Go build completed successfully"
 }
 
 # Clean build artifacts
 clean() {
     log_info "Cleaning build artifacts..."
     cargo clean -p dinja-core
-    rm -rf python-bindings/dist
-    rm -rf js-bindings/dist
+    rm -rf clients/py/dist
+    rm -rf clients/js/dist
     log_info "Clean completed"
 }
 
@@ -132,6 +150,7 @@ run_all_tests() {
     test_core
     test_python
     test_js
+    test_go
     log_info "All tests completed successfully!"
 }
 
@@ -152,6 +171,9 @@ case "${1:-help}" in
     build-js)
         build_js
         ;;
+    build-go)
+        build_go
+        ;;
     test)
         test_core
         ;;
@@ -163,6 +185,9 @@ case "${1:-help}" in
         ;;
     test-js)
         test_js
+        ;;
+    test-go)
+        test_go
         ;;
     test-all)
         run_all_tests
@@ -177,15 +202,17 @@ case "${1:-help}" in
         echo "  build              Build Rust core (debug mode)"
         echo "  build-release      Build Rust core (release mode)"
         echo "  build-js           Build JavaScript client"
+        echo "  build-go           Build Go client"
         echo "  test               Run Rust core tests"
         echo "  test-core          Run Rust core tests"
         echo "  test-python        Run Python HTTP client tests (requires service running)"
         echo "  test-js            Run JavaScript tests"
+        echo "  test-go            Run Go tests"
         echo "  test-all           Run all tests"
         echo "  clean              Clean build artifacts"
         echo "  help               Show this help message"
         echo ""
-        echo "Note: Python and TypeScript clients are pure HTTP clients."
+        echo "Note: Python, TypeScript, and Go clients are pure HTTP clients."
         echo "      Start the service with: docker run -p 8080:8080 ghcr.io/hlop3z/dinja:latest"
         ;;
     *)

@@ -10,7 +10,7 @@ Release utilities for the dinja workspace, implemented with Cyclopts.
 
 Commands:
 
-  * bump: update version strings for the Rust workspace, Python bindings, and/or JavaScript bindings.
+  * bump: update version strings for the Rust workspace, Python client, and/or JavaScript client.
           Examples:
               uv run release.py bump --version 0.3.0              # update all (use --version flag)
               uv run release.py bump --python-version 0.2.5       # python only
@@ -47,8 +47,8 @@ App = cyclopts_module.App
 Parameter = cyclopts_module.Parameter
 
 ROOT = Path(__file__).resolve().parent
-PYTHON_BINDINGS = ROOT / "python-bindings"
-JS_BINDINGS = ROOT / "js-bindings"
+PYTHON_CLIENT = ROOT / "clients" / "py"
+JS_CLIENT = ROOT / "clients" / "js"
 
 
 class ReleaseError(RuntimeError):
@@ -87,16 +87,16 @@ VERSION_FIELDS: Dict[str, tuple[VersionField, ...]] = {
         # Note: pyproject.toml uses dynamic versioning via hatch
         # so we only update __about__.py which is the source of truth
         VersionField(
-            path=PYTHON_BINDINGS / "dinja" / "__about__.py",
+            path=PYTHON_CLIENT / "dinja" / "__about__.py",
             pattern=_compile_version_pattern("__version__"),
-            label="python-bindings/dinja/__about__.py",
+            label="clients/py/dinja/__about__.py",
         ),
     ),
     "javascript": (
         VersionField(
-            path=JS_BINDINGS / "package.json",
+            path=JS_CLIENT / "package.json",
             pattern=_compile_json_version_pattern("version"),
-            label="js-bindings/package.json",
+            label="clients/js/package.json",
         ),
     ),
 }
@@ -284,15 +284,15 @@ def run_release_checks(*, skip_tests: bool, env: dict, debug: bool = False) -> N
         run_cmd(["cargo", "test", "-p", "dinja-core"], env=env, debug=debug)
 
     # Sync Python dependencies (no tests - they require the HTTP service)
-    run_cmd(["uv", "sync", "--dev"], cwd=PYTHON_BINDINGS, env=env, debug=debug)
+    run_cmd(["uv", "sync", "--dev"], cwd=PYTHON_CLIENT, env=env, debug=debug)
     # Note: Python tests are skipped during release because they require
     # the Dinja HTTP service to be running. Run them manually before release:
     #   docker run -p 8080:8080 ghcr.io/hlop3z/dinja:latest
-    #   cd python-bindings && uv run pytest
+    #   cd clients/py && uv run pytest
     if debug:
         print("[DEBUG] Python tests skipped (require HTTP service)")
         print("[DEBUG] Run manually: docker run -p 8080:8080 ghcr.io/hlop3z/dinja:latest")
-        print("[DEBUG] Then: cd python-bindings && uv run pytest")
+        print("[DEBUG] Then: cd clients/py && uv run pytest")
 
     if debug:
         print("[DEBUG] All release checks completed successfully")
@@ -340,17 +340,17 @@ def bump(
         str | None,
         Parameter(
             name="--version",
-            help="Version applied to Rust workspace, Python bindings, and JavaScript bindings.",
+            help="Version applied to Rust workspace, Python client, and JavaScript client.",
         ),
     ] = None,
     rust_version: Annotated[
         str | None, Parameter(help="Version applied only to the Rust workspace.")
     ] = None,
     python_version: Annotated[
-        str | None, Parameter(help="Version applied only to the Python bindings.")
+        str | None, Parameter(help="Version applied only to the Python client.")
     ] = None,
     javascript_version: Annotated[
-        str | None, Parameter(help="Version applied only to the JavaScript bindings.")
+        str | None, Parameter(help="Version applied only to the JavaScript client.")
     ] = None,
     dry_run: Annotated[
         bool, Parameter(help="Show planned edits without touching the files.")
@@ -472,8 +472,8 @@ def release(
                         "git",
                         "add",
                         "Cargo.toml",
-                        "python-bindings/dinja/__about__.py",
-                        "js-bindings/package.json",
+                        "clients/py/dinja/__about__.py",
+                        "clients/js/package.json",
                     ],
                     debug=debug,
                 )
