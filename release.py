@@ -84,11 +84,8 @@ VERSION_FIELDS: Dict[str, tuple[VersionField, ...]] = {
         ),
     ),
     "python": (
-        VersionField(
-            path=PYTHON_BINDINGS / "pyproject.toml",
-            pattern=_compile_version_pattern("version"),
-            label="python-bindings/pyproject.toml",
-        ),
+        # Note: pyproject.toml uses dynamic versioning via hatch
+        # so we only update __about__.py which is the source of truth
         VersionField(
             path=PYTHON_BINDINGS / "dinja" / "__about__.py",
             pattern=_compile_version_pattern("__version__"),
@@ -475,7 +472,6 @@ def release(
                         "git",
                         "add",
                         "Cargo.toml",
-                        "python-bindings/pyproject.toml",
                         "python-bindings/dinja/__about__.py",
                         "js-bindings/package.json",
                     ],
