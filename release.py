@@ -539,65 +539,6 @@ def release(
             print("[DEBUG] Dry run mode: skipping actual git operations")
         return
 
-    # Copy README.md to python-bindings directory (before creating tag)
-    readme_source = ROOT / "README.md"
-    readme_dest = PYTHON_BINDINGS / "README.md"
-    if debug:
-        print("[DEBUG] Copying README.md to python-bindings directory...")
-    if readme_source.exists():
-        readme_source_content = readme_source.read_text(encoding="utf-8")
-        readme_needs_update = True
-        if readme_dest.exists():
-            readme_dest_content = readme_dest.read_text(encoding="utf-8")
-            readme_needs_update = readme_source_content != readme_dest_content
-        if readme_needs_update:
-            readme_dest.write_text(readme_source_content, encoding="utf-8")
-            print("Updated python-bindings/README.md")
-            if not dry_run:
-                run_cmd(["git", "add", str(readme_dest)], debug=debug)
-                # Check if there are actual changes to commit (file might be untracked)
-                try:
-                    run_cmd(["git", "diff", "--cached", "--quiet"], debug=debug)
-                    # No staged changes, check if file is untracked
-                    result = subprocess.run(
-                        ["git", "status", "--porcelain", str(readme_dest)],
-                        capture_output=True,
-                        text=True,
-                        check=False,
-                    )
-                    if result.stdout.strip().startswith("??"):
-                        # File is untracked, commit it
-                        run_cmd(
-                            [
-                                "git",
-                                "commit",
-                                "-m",
-                                "chore: sync README.md to python-bindings",
-                            ],
-                            debug=debug,
-                        )
-                        print("Committed README.md update to python-bindings")
-                    else:
-                        if debug:
-                            print("[DEBUG] No changes to commit for README.md")
-                except subprocess.CalledProcessError:
-                    # There are staged changes, commit them
-                    run_cmd(
-                        [
-                            "git",
-                            "commit",
-                            "-m",
-                            "chore: sync README.md to python-bindings",
-                        ],
-                        debug=debug,
-                    )
-                    print("Committed README.md update to python-bindings")
-        elif debug:
-            print("[DEBUG] python-bindings/README.md is already up to date")
-    else:
-        if debug:
-            print("[DEBUG] README.md not found in root directory")
-
     # Write VERSION file with the released version (before creating tag)
     version_file = ROOT / "VERSION"
     if debug:

@@ -1,30 +1,33 @@
 # Python Examples
 
-Complete examples demonstrating Dinja's Python API.
+Complete examples demonstrating Dinja's Python HTTP client API.
+
+## Prerequisites
+
+Start the Dinja service:
+
+```bash
+docker pull ghcr.io/hlop3z/dinja:latest
+docker run -p 8080:8080 ghcr.io/hlop3z/dinja:latest
+```
 
 ## Basic Rendering
 
 ```python
-from dinja import Renderer, Input, Settings
+from dinja import Renderer
 
-renderer = Renderer()
+renderer = Renderer("http://localhost:8080")
 
-result = renderer.render(
-    Input(
-        mdx={"hello.mdx": "# Hello World\n\nThis is **markdown**!"},
-        settings=Settings(output="html"),
-    )
-)
+result = renderer.html(views={"hello.mdx": "# Hello World\n\nThis is **markdown**!"})
 
-entry = result["files"]["hello.mdx"]
-if entry["status"] == "success":
-    print(entry["result"]["output"])
+if result.is_all_success():
+    print(result.get_output("hello.mdx"))
 ```
 
 ## With Frontmatter
 
 ```python
-from dinja import Renderer, Input, Settings
+from dinja import Renderer
 
 mdx_content = """---
 title: My Page
@@ -36,29 +39,26 @@ author: John Doe
 This page has frontmatter metadata.
 """
 
-renderer = Renderer()
-result = renderer.render(
-    Input(
-        mdx={"page.mdx": mdx_content},
-        settings=Settings(output="html"),
-    )
-)
+renderer = Renderer("http://localhost:8080")
+result = renderer.html(views={"page.mdx": mdx_content})
 
-entry = result["files"]["page.mdx"]
-if entry["status"] == "success":
-    rendered = entry["result"]
-    print("Metadata:", rendered["metadata"])
-    print("Output:", rendered["output"])
+if result.is_all_success():
+    output = result.get_output("page.mdx")
+    metadata = result.get_metadata("page.mdx")
+
+    print("Title:", metadata.get("title"))
+    print("Author:", metadata.get("author"))
+    print("Output:", output)
 ```
 
 ## Custom Components
 
 ```python
-from dinja import Renderer, Input, Settings
+from dinja import Renderer
 
 components = {
-    "Button": "function Component(props) { return <button>{props.children}</button>; }",
-    "Card": "function Component(props) { return <div class='card'>{props.children}</div>; }",
+    "Button": "export default function Component(props) { return <button>{props.children}</button>; }",
+    "Card": "export default function Component(props) { return <div class='card'>{props.children}</div>; }",
 }
 
 mdx_content = """
@@ -69,125 +69,160 @@ mdx_content = """
 </Card>
 """
 
-renderer = Renderer()
-result = renderer.render(
-    Input(
-        mdx={"page.mdx": mdx_content},
-        settings=Settings(),
-        components=components,
-    )
+renderer = Renderer("http://localhost:8080")
+result = renderer.html(
+    views={"page.mdx": mdx_content},
+    components=components,
+)
+
+if result.is_all_success():
+    print(result.get_output("page.mdx"))
+```
+
+## Global Utilities
+
+```python
+from dinja import Renderer
+
+renderer = Renderer("http://localhost:8080")
+
+result = renderer.html(
+    views={"page.mdx": "<Greeting />"},
+    components={
+        "Greeting": "export default function Component() { return <div>{utils.message}</div>; }"
+    },
+    utils="export default { message: 'Hello World' }",
 )
 ```
 
 ## Multiple Output Formats
 
 ```python
-from dinja import Renderer, Input, Settings
+from dinja import Renderer
 
-renderer = Renderer()
-mdx = {"page.mdx": "# Hello World"}
+renderer = Renderer("http://localhost:8080")
+views = {"page.mdx": "# Hello World"}
 
 # HTML output
-html_result = renderer.render(
-    Input(
-        mdx=mdx,
-        settings=Settings(output="html"),
-    )
-)
+html_result = renderer.html(views=views)
 
 # JavaScript output
-js_result = renderer.render(
-    Input(
-        mdx=mdx,
-        settings=Settings(output="javascript"),
-    )
-)
+js_result = renderer.javascript(views=views)
 
-# Schema output
-schema_result = renderer.render(
-    Input(
-        mdx=mdx,
-        settings=Settings(output="schema"),
-    )
-)
+# Schema output (extract component names)
+schema_result = renderer.schema(views=views)
+
+# JSON tree output
+json_result = renderer.json(views=views)
 ```
 
 ## Batch Rendering
 
 ```python
-from dinja import Renderer, Input, Settings
+from dinja import Renderer
 
-renderer = Renderer()
+renderer = Renderer("http://localhost:8080")
 
-result = renderer.render(
-    Input(
-        mdx={
-            "index.mdx": "# Home Page",
-            "about.mdx": "# About Us",
-            "contact.mdx": "# Contact",
-        },
-        settings=Settings(output="html"),
-    )
+result = renderer.html(
+    views={
+        "index.mdx": "# Home Page",
+        "about.mdx": "# About Us",
+        "contact.mdx": "# Contact",
+    }
 )
 
-print(f"Total: {result['total']}")
-print(f"Succeeded: {result['succeeded']}")
-print(f"Failed: {result['failed']}")
+print(f"Total: {result.total}")
+print(f"Succeeded: {result.succeeded}")
+print(f"Failed: {result.failed}")
 
-for filename, entry in result["files"].items():
-    if entry["status"] == "success":
+for filename, file_result in result.files.items():
+    if file_result.success:
         print(f"✓ {filename}")
     else:
-        print(f"✗ {filename}: {entry.get('error')}")
+        print(f"✗ {filename}: {file_result.error}")
 ```
 
 ## Error Handling
 
 ```python
-from dinja import Renderer, Input, Settings
+from dinja import Renderer
 
-renderer = Renderer()
+renderer = Renderer("http://localhost:8080")
 
-try:
-    result = renderer.render(
-        Input(
-            mdx={"page.mdx": "# Content"},
-            settings=Settings(output="html"),
-        )
-    )
-    
-    for filename, entry in result["files"].items():
-        if entry["status"] == "success":
-            print(f"✓ {filename} rendered successfully")
-        else:
-            print(f"✗ {filename} failed: {entry.get('error')}")
-            
-    if result["errors"]:
-        for error in result["errors"]:
-            print(f"Error in {error['file']}: {error['message']}")
-            
-except ValueError as e:
-    print(f"Invalid request: {e}")
-except RuntimeError as e:
-    print(f"Runtime error: {e}")
+# Check if service is running
+if not renderer.health():
+    print("Dinja service is not running!")
+    exit(1)
+
+result = renderer.html(views={"page.mdx": "# Content"})
+
+if result.is_all_success():
+    print("All files rendered successfully!")
+    print(result.get_output("page.mdx"))
+else:
+    print(f"Some files failed: {result.failed} of {result.total}")
+    for error in result.errors:
+        print(f"Error in {error['file']}: {error['message']}")
 ```
 
-## Custom Retry Configuration
+## Using Component Dataclass
+
+```python
+from dinja import Renderer, Component
+
+renderer = Renderer("http://localhost:8080")
+
+# Full Component definition with metadata
+components = {
+    "Button": Component(
+        code="export default function Component(props) { return <button>{props.children}</button>; }",
+        name="Button",
+        docs="A button component",
+        args={"children": "ReactNode"},
+    )
+}
+
+result = renderer.html(
+    views={"page.mdx": "<Button>Click me</Button>"},
+    components=components,
+)
+```
+
+## Custom Directives
 
 ```python
 from dinja import Renderer
 
-# Configure for high-load scenarios
-renderer = Renderer(
-    max_retries=5,
-    retry_delay=0.1,
-    backoff_factor=2.0
-)
+renderer = Renderer("http://localhost:8080")
 
-# Use the renderer as normal
-result = renderer.render({
-    "settings": {"output": "html"},
-    "mdx": {"page.mdx": "# Content"},
-})
+result = renderer.html(
+    views={"page.mdx": "# Content with directives"},
+    directives=["use client", "use server"],
+)
 ```
 
+## With Context Function
+
+```python
+from dinja import Renderer
+
+renderer = Renderer("http://localhost:8080")
+
+result = renderer.html(
+    views={
+        "blog.mdx": """---
+title: My Post
+author: Alice
+---
+
+# {context('title')}
+
+By {context('author')}
+"""
+    }
+)
+
+if result.is_all_success():
+    print(result.get_output("blog.mdx"))
+    print(result.get_metadata("blog.mdx"))
+```

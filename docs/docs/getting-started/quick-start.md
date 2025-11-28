@@ -2,77 +2,67 @@
 
 Get up and running with Dinja in minutes.
 
-## Python Quick Start
+## 1. Start the Service
 
-### 1. Create a Renderer
-
-```python
-from dinja import Renderer
-
-renderer = Renderer()
+```bash
+docker pull ghcr.io/hlop3z/dinja:latest
+docker run -p 8080:8080 ghcr.io/hlop3z/dinja:latest
 ```
 
-### 2. Render Your First MDX
+## 2. Install a Client
 
-```python
-from dinja import Input, Settings
+=== "Python"
 
-result = renderer.render(
-    Input(
-        mdx={"hello.mdx": "# Hello World\n\nThis is my first MDX file!"},
-        settings=Settings(output="html"),
+    ```bash
+    pip install dinja
+    ```
+
+=== "TypeScript"
+
+    ```bash
+    npm install @dinja/core
+    ```
+
+## 3. Render Your First MDX
+
+=== "Python"
+
+    ```python
+    from dinja import Renderer
+
+    renderer = Renderer("http://localhost:8080")
+
+    result = renderer.html(
+        views={"hello.mdx": "# Hello World\n\nThis is my first MDX file!"}
     )
-)
-```
 
-### 3. Access the Result
+    print(result.get_output("hello.mdx"))
+    # <h1>Hello World</h1><p>This is my first MDX file!</p>
+    ```
 
-```python
-entry = result["files"]["hello.mdx"]
+=== "TypeScript"
 
-if entry["status"] == "success":
-    rendered = entry["result"]
-    print(rendered["output"])  # <h1>Hello World</h1>...
-    print(rendered["metadata"])  # {} (no frontmatter in this example)
-else:
-    print(f"Error: {entry.get('error')}")
-```
+    ```typescript
+    import { Renderer, getOutput } from '@dinja/core';
 
-## Rust Quick Start
+    const renderer = new Renderer({ baseUrl: 'http://localhost:8080' });
 
-### 1. Create a Render Service
+    const result = await renderer.html({
+        views: { 'hello.mdx': '# Hello World\n\nThis is my first MDX file!' }
+    });
 
-```rust
-use dinja_core::service::{RenderService, RenderServiceConfig};
-
-let config = RenderServiceConfig::default();
-let service = RenderService::new(config)?;
-```
-
-### 2. Render Your First MDX
-
-```rust
-let html = service.render_string(
-    "hello.mdx",
-    "# Hello World\n\nThis is my first MDX file!"
-)?;
-```
-
-### 3. Use the Result
-
-```rust
-println!("{}", html);  // <h1>Hello World</h1>...
-```
+    console.log(getOutput(result, 'hello.mdx'));
+    // <h1>Hello World</h1><p>This is my first MDX file!</p>
+    ```
 
 ## Complete Example
 
 === "Python"
 
     ```python
-    from dinja import Renderer, Input, Settings
+    from dinja import Renderer
 
-    # Create renderer
-    renderer = Renderer()
+    renderer = Renderer("http://localhost:8080")
 
     # Define MDX content with frontmatter
     mdx_content = """---
@@ -80,76 +70,93 @@ println!("{}", html);  // <h1>Hello World</h1>...
     author: John Doe
     ---
     # Welcome to Dinja
-    
+
     This is **markdown** with *formatting*.
     """
 
     # Render
-    result = renderer.render(
-        Input(
-            mdx={"index.mdx": mdx_content},
-            settings=Settings(output="html", minify=True),
-        )
-    )
+    result = renderer.html(views={"index.mdx": mdx_content})
 
-    # Process results
-    for filename, entry in result["files"].items():
-        if entry["status"] == "success":
-            rendered = entry["result"]
-            metadata = rendered.get("metadata", {})
-            output = rendered.get("output", "")
-            
-            print(f"File: {filename}")
-            print(f"Title: {metadata.get('title')}")
-            print(f"Author: {metadata.get('author')}")
-            print(f"HTML: {output[:100]}...")
+    # Check success
+    if result.is_all_success():
+        output = result.get_output("index.mdx")
+        metadata = result.get_metadata("index.mdx")
+
+        print(f"Title: {metadata.get('title')}")
+        print(f"Author: {metadata.get('author')}")
+        print(f"HTML: {output}")
     ```
 
-=== "Rust"
+=== "TypeScript"
 
-    ```rust
-    use dinja_core::service::{RenderService, RenderServiceConfig};
-    use std::collections::HashMap;
+    ```typescript
+    import { Renderer, isAllSuccess, getOutput, getMetadata } from '@dinja/core';
 
-    let config = RenderServiceConfig::default();
-    let service = RenderService::new(config)?;
+    const renderer = new Renderer({ baseUrl: 'http://localhost:8080' });
 
-    let mdx_content = r#"---
+    const mdxContent = `---
     title: My First Page
     author: John Doe
     ---
     # Welcome to Dinja
-    
+
     This is **markdown** with *formatting*.
-    "#;
+    `;
 
-    let mut mdx_files = HashMap::new();
-    mdx_files.insert("index.mdx".to_string(), mdx_content.to_string());
+    const result = await renderer.html({
+        views: { 'index.mdx': mdxContent }
+    });
 
-    let input = dinja_core::models::Input {
-        settings: dinja_core::models::Settings {
-            output: dinja_core::models::OutputFormat::Html,
+    if (isAllSuccess(result)) {
+        const output = getOutput(result, 'index.mdx');
+        const metadata = getMetadata(result, 'index.mdx');
+
+        console.log(`Title: ${metadata.title}`);
+        console.log(`Author: ${metadata.author}`);
+        console.log(`HTML: ${output}`);
+    }
+    ```
+
+## Rust Quick Start
+
+For direct Rust integration:
+
+```rust
+use dinja_core::service::{RenderService, RenderServiceConfig};
+use dinja_core::models::{NamedMdxBatchInput, RenderSettings, OutputFormat};
+use std::collections::HashMap;
+
+fn main() -> anyhow::Result<()> {
+    let service = RenderService::new(RenderServiceConfig::default())?;
+
+    let mut mdx = HashMap::new();
+    mdx.insert("hello.mdx".to_string(), "# Hello World".to_string());
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
             minify: true,
-            ..Default::default()
+            utils: None,
+            directives: None,
         },
-        mdx: mdx_files,
+        mdx,
         components: None,
     };
 
     let outcome = service.render_batch(&input)?;
 
-    for (filename, file_result) in outcome.files {
-        if let Some(rendered) = file_result.result {
-            println!("File: {}", filename);
-            println!("Title: {:?}", rendered.metadata.get("title"));
-            println!("HTML: {}...", &rendered.output.unwrap_or_default()[..100.min(rendered.output.as_ref().map(|s| s.len()).unwrap_or(0))]);
+    if let Some(entry) = outcome.files.get("hello.mdx") {
+        if let Some(ref result) = entry.result {
+            println!("{}", result.output);
         }
     }
-    ```
+
+    Ok(())
+}
+```
 
 ## Next Steps
 
 - Learn about [Output Formats](../guides/output-formats.md)
 - Explore [Component Support](../guides/components.md)
 - Check out the [Python API Reference](../python/overview.md)
-
