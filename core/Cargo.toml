@@ -50,6 +50,8 @@ oxc_codegen = "0.99.0"
 oxc_transformer = "0.99.0"
 oxc_span = "0.99.0"
 oxc_semantic = "0.99.0"
+oxc_diagnostics = "0.99.0"
+
 
 [[example]]
 name = "test_render"

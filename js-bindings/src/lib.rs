@@ -13,6 +13,7 @@ use std::sync::Mutex;
 const ENGINE_MIN_JS: &str = include_str!("../../core/static/engine.min.js");
 const ENGINE_TO_STRING_MIN_JS: &str = include_str!("../../core/static/engine_to_string.min.js");
 const CORE_JS: &str = include_str!("../../core/static/core.js");
+const HELPERS_JS: &str = include_str!("../../core/static/helpers.js");
 
 // Global static directory path - created once on first use
 static STATIC_DIR: OnceCell<PathBuf> = OnceCell::new();
@@ -73,6 +74,14 @@ fn init_static_dir() -> Result<PathBuf> {
                     format!("Failed to write core.js: {}", e),
                 )
             })?;
+
+            fs::write(static_dir.join("helpers.js"), HELPERS_JS).map_err(|e| {
+                Error::new(
+                    Status::GenericFailure,
+                    format!("Failed to write helpers.js: {}", e),
+                )
+            })?;
+
             Ok(static_dir)
         })
         .cloned()

@@ -134,7 +134,7 @@ impl<'pool> RendererLease<'pool> {
     pub fn renderer(&self) -> Result<&JsRenderer, MdxError> {
         self.renderer
             .as_ref()
-            .ok_or_else(|| MdxError::TsxTransform("Renderer already returned to pool".to_string()))
+            .ok_or_else(|| MdxError::tsx_transform("Renderer already returned to pool"))
     }
 }
 

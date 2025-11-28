@@ -125,7 +125,7 @@ impl JsRenderer {
             let result = runtime
                 .execute_script(script_tags::RENDER, render_script)
                 .map_err(|e| {
-                    anyhow::Error::from(MdxError::TsxTransform(format!(
+                    anyhow::Error::from(MdxError::tsx_transform(format!(
                         "Failed to render component: {e:?}"
                     )))
                 })?;
@@ -203,7 +203,7 @@ impl JsRenderer {
             let result = runtime
                 .execute_script(script_tags::RENDER, render_script)
                 .map_err(|e| {
-                    anyhow::Error::from(MdxError::TsxTransform(format!(
+                    anyhow::Error::from(MdxError::tsx_transform(format!(
                         "Failed to render component to schema: {e:?}"
                     )))
                 })?;

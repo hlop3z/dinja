@@ -376,18 +376,15 @@ impl RenderService {
                 }
                 Err(err) => {
                     failed += 1;
+                    // Create BatchError from MdxError to extract location info
+                    let batch_error = BatchError::from_mdx_error(name.clone(), &err);
+                    let message = batch_error.message.clone();
+
                     // Convert MdxError to anyhow::Error for error response creation
-                    // Using `anyhow::Error::from()` preserves the error chain automatically
-                    // since MdxError implements std::error::Error via thiserror
                     let anyhow_err = anyhow::Error::from(err);
-                    // Preserve full error context including chain using {:#} format
-                    // This includes all underlying causes in the error chain
-                    let message = format!("{:#}", anyhow_err);
                     let fallback = create_error_response(&anyhow_err);
-                    errors.push(BatchError {
-                        file: name.clone(),
-                        message: message.clone(),
-                    });
+
+                    errors.push(batch_error);
                     files.insert(name.clone(), FileRenderOutcome::failure(message, fallback));
                 }
             }
@@ -560,12 +557,74 @@ impl BatchRenderOutcome {
 }
 
 /// Error information for a single file in a batch
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BatchError {
     /// Name of the file that failed
     pub file: String,
     /// Error message describing the failure
     pub message: String,
+    /// 0-indexed line number (if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line: Option<u32>,
+    /// 0-indexed column number (if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub column: Option<u32>,
+    /// Byte offset in source code (if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offset: Option<u32>,
+    /// Length of the error span in bytes (if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub length: Option<u32>,
+    /// Help text or suggestion (if available)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub help: Option<String>,
+}
+
+impl BatchError {
+    /// Creates a new batch error with just file and message
+    pub fn new(file: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            file: file.into(),
+            message: message.into(),
+            line: None,
+            column: None,
+            offset: None,
+            length: None,
+            help: None,
+        }
+    }
+
+    /// Creates a batch error from an MdxError, extracting location info if available
+    pub fn from_mdx_error(file: impl Into<String>, error: &crate::error::MdxError) -> Self {
+        let file = file.into();
+        let message = error.to_string();
+
+        // Try to extract location info from parse/transform errors
+        if let Some(first_error) = error.first_error() {
+            let (line, column, offset, length) = if let Some(loc) = &first_error.location {
+                (
+                    Some(loc.line),
+                    Some(loc.column),
+                    Some(loc.offset),
+                    Some(loc.length),
+                )
+            } else {
+                (None, None, None, None)
+            };
+
+            Self {
+                file,
+                message,
+                line,
+                column,
+                offset,
+                length,
+                help: first_error.help.clone(),
+            }
+        } else {
+            Self::new(file, message)
+        }
+    }
 }
 
 /// Status of a single file render operation

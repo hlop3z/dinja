@@ -130,7 +130,7 @@ pub(super) fn cleanup_runtime(runtime: &mut JsRuntime) -> Result<(), MdxError> {
 
     runtime
         .execute_script(script_tags::CLEANUP_RUNTIME, CLEANUP_SCRIPT)
-        .map_err(|e| MdxError::TsxTransform(format!("Failed to cleanup runtime: {e:?}")))?;
+        .map_err(|e| MdxError::tsx_transform(format!("Failed to cleanup runtime: {e:?}")))?;
 
     Ok(())
 }
@@ -172,11 +172,11 @@ pub(super) fn setup_context(runtime: &mut JsRuntime, props_json: &str) -> Result
         "#,
         props_json = props_json
     )
-    .map_err(|e| MdxError::TsxTransform(format!("Failed to build context setup script: {e}")))?;
+    .map_err(|e| MdxError::tsx_transform(format!("Failed to build context setup script: {e}")))?;
 
     runtime
         .execute_script(script_tags::SETUP_CONTEXT, setup_context)
-        .map_err(|e| MdxError::TsxTransform(format!("Failed to setup context: {e:?}")))?;
+        .map_err(|e| MdxError::tsx_transform(format!("Failed to setup context: {e:?}")))?;
     Ok(())
 }
 
@@ -193,9 +193,9 @@ pub(super) fn extract_string_from_v8(
         local
             .to_string(scope)
             .map(|s| s.to_rust_string_lossy(scope))
-            .ok_or_else(|| MdxError::TsxTransform(error_msg.to_string()))
+            .ok_or_else(|| MdxError::tsx_transform(error_msg))
     } else {
-        Err(MdxError::TsxTransform(format!(
+        Err(MdxError::tsx_transform(format!(
             "{error_msg}: result is not a string"
         )))
     }

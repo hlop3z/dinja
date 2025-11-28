@@ -115,7 +115,7 @@ pub(super) fn setup_globals(runtime: &mut JsRuntime) -> Result<(), MdxError> {
 
     runtime
         .execute_script(script_tags::SETUP, SETUP_GLOBALS)
-        .map_err(|e| MdxError::TsxTransform(format!("Failed to setup globals: {e:?}")))?;
+        .map_err(|e| MdxError::tsx_transform(format!("Failed to setup globals: {e:?}")))?;
     Ok(())
 }
 
@@ -155,7 +155,7 @@ pub(super) fn load_js_file(
         .execute_script(script_tag, wrapped_code)
         .map_err(|e| {
             let error_details = format!("{e:?}");
-            MdxError::TsxTransform(format!(
+            MdxError::tsx_transform(format!(
                 "Failed to load {}: {}. \
                 This might be due to missing browser APIs or incompatible JavaScript code.",
                 file_name, error_details
@@ -174,7 +174,7 @@ pub(super) fn verify_global_var(
 ) -> Result<(), MdxError> {
     runtime
         .execute_script(check_script_tag, verify_script)
-        .map_err(|e| MdxError::TsxTransform(format!("Failed to verify {}: {e:?}", var_name)))?;
+        .map_err(|e| MdxError::tsx_transform(format!("Failed to verify {}: {e:?}", var_name)))?;
     Ok(())
 }
 
@@ -189,7 +189,7 @@ pub(super) fn load_engine_library(
         static_files::ENGINE_MIN_JS,
         script_tags::ENGINE,
     )
-    .map_err(|e| MdxError::TsxTransform(format!("Failed to load engine: {e:?}")))?;
+    .map_err(|e| MdxError::tsx_transform(format!("Failed to load engine: {e:?}")))?;
 
     verify_global_var(
         runtime,
@@ -321,7 +321,7 @@ pub(super) fn load_engine_library(
 
     runtime
         .execute_script(script_tags::WRAP_H_FUNCTION, WRAP_H_FUNCTION)
-        .map_err(|e| MdxError::TsxTransform(format!("Failed to wrap h function: {e:?}")))?;
+        .map_err(|e| MdxError::tsx_transform(format!("Failed to wrap h function: {e:?}")))?;
 
     Ok(())
 }
@@ -337,7 +337,7 @@ pub(super) fn load_engine_render_library(
         static_files::ENGINE_TO_STRING_MIN_JS,
         script_tags::ENGINE_TO_STRING,
     )
-    .map_err(|e| MdxError::TsxTransform(format!("Failed to load engine_to_string: {e:?}")))?;
+    .map_err(|e| MdxError::tsx_transform(format!("Failed to load engine_to_string: {e:?}")))?;
 
     verify_global_var(
         runtime,
@@ -363,7 +363,7 @@ pub(super) fn load_core_engine_library(
         static_files::CORE_JS,
         script_tags::CORE_ENGINE,
     )
-    .map_err(|e| MdxError::TsxTransform(format!("Failed to load core.js: {e:?}")))?;
+    .map_err(|e| MdxError::tsx_transform(format!("Failed to load core.js: {e:?}")))?;
 
     verify_global_var(
         runtime,
@@ -386,7 +386,7 @@ pub(super) fn load_helpers(runtime: &mut JsRuntime, static_path: &Path) -> Resul
         static_files::HELPERS_JS,
         script_tags::HELPERS,
     )
-    .map_err(|e| MdxError::TsxTransform(format!("Failed to load helpers: {e:?}")))?;
+    .map_err(|e| MdxError::tsx_transform(format!("Failed to load helpers: {e:?}")))?;
     Ok(())
 }
 
@@ -421,7 +421,7 @@ pub(super) fn load_static_files_internal(
     runtime
         .execute_script(script_tags::SETUP, SAVE_PREACT_ENGINE)
         .map_err(|e| {
-            anyhow::Error::from(MdxError::TsxTransform(format!(
+            anyhow::Error::from(MdxError::tsx_transform(format!(
                 "Failed to save preact engine reference: {e:?}"
             )))
         })?;
@@ -446,7 +446,7 @@ pub(super) fn load_static_files_internal(
     runtime
         .execute_script(script_tags::SETUP, SETUP_DUAL_ENGINES)
         .map_err(|e| {
-            anyhow::Error::from(MdxError::TsxTransform(format!(
+            anyhow::Error::from(MdxError::tsx_transform(format!(
                 "Failed to setup dual engines: {e:?}"
             )))
         })?;

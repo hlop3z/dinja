@@ -143,7 +143,7 @@ pub(super) fn build_render_script_wrapper(
         props_json = props_json,
         render_body = render_body
     )
-    .map_err(|e| MdxError::TsxTransform(format!("Failed to write script wrapper: {e}")))?;
+    .map_err(|e| MdxError::tsx_transform(format!("Failed to write script wrapper: {e}")))?;
 
     Ok(script)
 }
@@ -231,7 +231,7 @@ pub(super) fn build_single_component_registration(
     component_js: &str,
 ) -> Result<String, MdxError> {
     let name_literal = serde_json::to_string(registration_name).map_err(|e| {
-        MdxError::TsxTransform(format!(
+        MdxError::tsx_transform(format!(
             "Failed to serialize component name {registration_name}: {e}"
         ))
     })?;
@@ -263,7 +263,7 @@ pub(super) fn build_single_component_registration(
         resolve_component = resolve_component
     )
     .map_err(|e| {
-        MdxError::TsxTransform(format!(
+        MdxError::tsx_transform(format!(
             "Failed to build component registration script for {registration_name}: {e}"
         ))
     })?;
@@ -297,7 +297,7 @@ pub(super) fn build_component_registration_script(
         let registration_name = comp_def.name.as_deref().unwrap_or(map_key.as_str());
         let component_js =
             crate::transform::transform_component_code(&comp_def.code).map_err(|e| {
-                MdxError::TsxTransform(format!(
+                MdxError::tsx_transform(format!(
                     "Failed to transform component {registration_name} code: {e:?}"
                 ))
             })?;

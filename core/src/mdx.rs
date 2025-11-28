@@ -744,7 +744,7 @@ fn render_with_engine_pipeline(
 
             let javascript_output = transform_tsx_to_js_with_config(html_output, transform_config)
                 .map_err(|e| {
-                    MdxError::TsxTransform(format!("Failed to transform TSX to JavaScript: {e}"))
+                    MdxError::tsx_transform(format!("Failed to transform TSX to JavaScript: {e}"))
                 })?;
 
             // Render to JSON tree using core.js engine
@@ -787,7 +787,7 @@ fn render_with_engine_pipeline(
 
             let javascript_output = transform_tsx_to_js_with_config(html_output, transform_config)
                 .map_err(|e| {
-                    MdxError::TsxTransform(format!("Failed to transform TSX to JavaScript: {e}"))
+                    MdxError::tsx_transform(format!("Failed to transform TSX to JavaScript: {e}"))
                 })?;
 
             // HOT PATH: Component rendering - executes JavaScript and renders to HTML
@@ -801,7 +801,7 @@ fn render_with_engine_pipeline(
                 OutputFormat::Javascript => {
                     transform_tsx_to_js_for_output(&template_output, context.settings.minify)
                         .map_err(|e| {
-                            MdxError::TsxTransform(format!(
+                            MdxError::tsx_transform(format!(
                                 "Failed to transform template to JavaScript: {e}"
                             ))
                         })
@@ -830,7 +830,7 @@ fn render_template(
         )
         .map_err(|e| {
             log_render_error(&e, javascript_output, "Component");
-            MdxError::TsxTransform(format!("Failed to render component template: {:#}", e))
+            MdxError::tsx_transform(format!("Failed to render component template: {:#}", e))
         })
 }
 
@@ -848,7 +848,7 @@ fn render_template_to_schema(
         )
         .map_err(|e| {
             log_render_error(&e, javascript_output, "Schema");
-            MdxError::TsxTransform(format!("Failed to render component to schema: {:#}", e))
+            MdxError::tsx_transform(format!("Failed to render component to schema: {:#}", e))
         })
 }
 

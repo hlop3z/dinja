@@ -15,11 +15,13 @@
 //! ## Error Handling
 //!
 //! All transformation errors use `MdxError` for domain-specific error reporting.
+//! Errors include source location information when available from OXC.
 
-use crate::error::MdxError;
+use crate::error::{byte_offset_to_line_col, MdxError, ParseError, SourceLocation};
 use crate::models::TsxTransformConfig;
 use oxc_allocator::Allocator;
 use oxc_codegen::{Codegen, CodegenOptions};
+use oxc_diagnostics::OxcDiagnostic;
 use oxc_parser::Parser;
 use oxc_semantic::SemanticBuilder;
 use oxc_span::SourceType;
@@ -140,33 +142,48 @@ pub fn transform_tsx_to_js_for_output(tsx_content: &str, minify: bool) -> Result
     transform_tsx_to_js_with_config(tsx_content, TsxTransformConfig::for_output(minify))
 }
 
-/// Estimated characters per error message including separators
-const ESTIMATED_CHARS_PER_ERROR: usize = 60;
+/// Extracts parse errors from OXC diagnostics with location info
+///
+/// This function converts OXC's `OxcDiagnostic` errors into our `ParseError` type,
+/// extracting source location information when available from the diagnostic labels.
+fn extract_parse_errors(diagnostics: &[OxcDiagnostic], source: &str) -> Vec<ParseError> {
+    diagnostics
+        .iter()
+        .map(|diag| {
+            // Get the error message
+            let message = diag.to_string();
 
-/// Formats a collection of errors into a single error message
-fn format_errors(errors: &[impl std::fmt::Debug]) -> String {
-    if errors.is_empty() {
-        return String::new();
-    }
+            // Try to extract location from diagnostic labels
+            // OxcDiagnostic derefs to OxcDiagnosticInner which has public labels field
+            let location = diag.labels.as_ref().and_then(|labels| {
+                labels.first().map(|label| {
+                    let offset = label.offset() as u32;
+                    let length = label.len() as u32;
+                    let (line, column) = byte_offset_to_line_col(source, offset);
+                    SourceLocation::new(line, column, offset, length)
+                })
+            });
 
-    // Pre-allocate with estimated capacity to reduce reallocations
-    let estimated_capacity = errors.len() * ESTIMATED_CHARS_PER_ERROR;
-    errors.iter().map(|e| format!("{e:?}")).fold(
-        String::with_capacity(estimated_capacity),
-        |mut acc, e| {
-            if !acc.is_empty() {
-                acc.push_str(", ");
+            // Try to get help text from the public help field
+            let help = diag.help.as_ref().map(|h| h.to_string());
+
+            ParseError {
+                message,
+                location,
+                help,
             }
-            acc.push_str(&e);
-            acc
-        },
-    )
+        })
+        .collect()
 }
 
 /// Validates and parses TSX content, returning an error if parsing fails
-fn validate_parse_result(parser_return: &oxc_parser::ParserReturn) -> Result<(), MdxError> {
+fn validate_parse_result(
+    parser_return: &oxc_parser::ParserReturn,
+    source: &str,
+) -> Result<(), MdxError> {
     if !parser_return.errors.is_empty() {
-        return Err(MdxError::TsxParse(format_errors(&parser_return.errors)));
+        let errors = extract_parse_errors(&parser_return.errors, source);
+        return Err(MdxError::TsxParse(errors));
     }
     Ok(())
 }
@@ -174,11 +191,11 @@ fn validate_parse_result(parser_return: &oxc_parser::ParserReturn) -> Result<(),
 /// Validates JSX transformation result, returning an error if transformation fails
 fn validate_transform_result(
     transform_return: &oxc_transformer::TransformerReturn,
+    source: &str,
 ) -> Result<(), MdxError> {
     if !transform_return.errors.is_empty() {
-        return Err(MdxError::TsxTransform(format_errors(
-            &transform_return.errors,
-        )));
+        let errors = extract_parse_errors(&transform_return.errors, source);
+        return Err(MdxError::TsxTransform(errors));
     }
     Ok(())
 }
@@ -335,7 +352,7 @@ fn transform_tsx_internal(
 
     // Parse TSX source into AST
     let parser_return = Parser::new(&allocator, &content_to_parse, source_type).parse();
-    validate_parse_result(&parser_return)?;
+    validate_parse_result(&parser_return, &content_to_parse)?;
 
     let mut program = parser_return.program;
 
@@ -348,7 +365,7 @@ fn transform_tsx_internal(
     let transform_options = create_transform_options(config);
     let transform_return = Transformer::new(&allocator, path, &transform_options)
         .build_with_scoping(semantic_return.semantic.into_scoping(), &mut program);
-    validate_transform_result(&transform_return)?;
+    validate_transform_result(&transform_return, &content_to_parse)?;
 
     // Generate JavaScript code from transformed AST
     let codegen_options = CodegenOptions {
