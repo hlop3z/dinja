@@ -1196,3 +1196,86 @@ fn test_component_with_fragment() {
     );
     assert!(html.contains("<hr"), "Should contain hr element: {}", html);
 }
+
+#[test]
+fn test_markdown_edge_cases_complex_nesting() {
+    // Tests complex markdown with deeply nested structures, code blocks,
+    // tables, blockquotes, and special characters
+    let service = create_test_service();
+
+    let edge_cases_content = include_str!("edge_cases.md");
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("edge_cases.mdx".to_string(), edge_cases_content.to_string());
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service
+        .render_batch(&input)
+        .expect("Failed to render batch");
+
+    // Print errors for debugging if any
+    if !outcome.errors.is_empty() {
+        for err in &outcome.errors {
+            eprintln!("Error in {}: {}", err.file, err.message);
+            if let Some(line) = err.line {
+                eprintln!("  Line: {}, Column: {:?}", line, err.column);
+            }
+            if let Some(help) = &err.help {
+                eprintln!("  Help: {}", help);
+            }
+        }
+    }
+
+    assert!(
+        outcome.is_all_success(),
+        "Edge cases markdown should render successfully. Errors: {:?}",
+        outcome.errors
+    );
+
+    let file_outcome = outcome.files.get("edge_cases.mdx").expect("File not found");
+    let result = file_outcome
+        .result
+        .as_ref()
+        .expect("Result should be present");
+    let html = result.output.as_ref().expect("HTML should be present");
+
+    // Verify basic structure is preserved
+    assert!(
+        html.contains("<h1>"),
+        "Should contain h1 heading: {}",
+        &html[..500.min(html.len())]
+    );
+
+    // Verify code blocks rendered with escaped braces
+    assert!(
+        html.contains("<pre>") || html.contains("<code"),
+        "Should contain code blocks"
+    );
+
+    // Verify tables rendered
+    assert!(html.contains("<table"), "Should contain tables");
+
+    // Verify blockquotes rendered
+    assert!(html.contains("<blockquote"), "Should contain blockquotes");
+
+    // Verify task lists rendered (checkboxes)
+    assert!(
+        html.contains("type=\"checkbox\"") || html.contains("[x]") || html.contains("[ ]"),
+        "Should contain task list items"
+    );
+
+    println!(
+        "Edge cases rendered successfully! Output length: {} chars",
+        html.len()
+    );
+}
