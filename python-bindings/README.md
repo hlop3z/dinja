@@ -1,146 +1,119 @@
-<div align="center">
+# Dinja Python Client
 
-![Dinja Logo](docs/docs/assets/media/logo.png)
-
-[![Documentation](https://img.shields.io/badge/docs-github.io-blue?style=flat-square)](https://hlop3z.github.io/dinja)
-[![Python](https://img.shields.io/pypi/v/dinja?style=flat-square)](https://pypi.org/project/dinja/)
-[![Rust](https://img.shields.io/crates/v/dinja-core?style=flat-square)](https://crates.io/crates/dinja-core)
-[![GitHub stars](https://img.shields.io/github/stars/hlop3z/dinja?style=flat-square)](https://github.com/hlop3z/dinja/stargazers)
-[![License](https://img.shields.io/github/license/hlop3z/dinja?style=flat-square)](LICENSE)
-
-</div>
-
-# Dinja
-
-Safe, deterministic MDX rendering powered by a Rust core with batteries-included Python bindings.
-
-## Links
-
-- [Read the Docs](https://hlop3z.github.io/dinja)
-- [GitHub](https://github.com/hlop3z/dinja)
-- [PyPI](https://pypi.org/project/dinja)
-- [Crates.io](https://crates.io/crates/dinja-core)
+HTTP client for the Dinja MDX rendering service.
 
 ## Installation
 
-| Target         | Command                |
-| -------------- | ---------------------- |
-| Python package | `uv add dinja`         |
-| Rust crate     | `cargo add dinja-core` |
+```bash
+pip install dinja
+```
+
+## Requirements
+
+Start the Dinja service via Docker:
+
+```bash
+docker pull ghcr.io/hlop3z/dinja:latest
+docker run -p 8080:8080 ghcr.io/hlop3z/dinja:latest
+```
 
 ## Usage
 
-### Rust
+```python
+from dinja import Renderer, Input, Result
 
-```rust
-use dinja_core::service::{RenderService, RenderServiceConfig};
+# Connect to the service
+renderer = Renderer("http://localhost:8080")
 
-fn main() -> anyhow::Result<()> {
-    let config = RenderServiceConfig::default();
-    let service = RenderService::new(config)?;
+# Check health
+if renderer.health():
+    print("Service is running!")
 
-    let html = service.render_string("example.mdx", "# Hello **dinja**")?;
-    println!("{html}");
-    Ok(())
-}
+# Render MDX to HTML
+result = renderer.html(
+    mdx={"page.mdx": "# Hello World\n\nThis is **bold** text."},
+    utils="export default { greeting: 'Hello' }",
+)
+
+# Get the output
+print(result.get_output("page.mdx"))
+# Output: <h1>Hello World</h1><p>This is <strong>bold</strong> text.</p>
 ```
 
-### Python
+## Render Methods
 
 ```python
-from dinja import Renderer, Input, Settings
+# Render to HTML
+result = renderer.html(mdx={...})
 
-# Create a renderer instance (engine loads once)
-renderer = Renderer()
+# Render to JavaScript
+result = renderer.javascript(mdx={...})
 
-# Render MDX content with type-safe dataclasses
-result = renderer.render(
-    Input(
-        mdx={"example.mdx": "---\ntitle: Demo\n---\n# Hello **dinja**"},
-        settings=Settings(output="html", minify=True),
-    )
-)
+# Extract schema (component names)
+result = renderer.schema(mdx={...})
 
-entry = result["files"]["example.mdx"]
+# Render to JSON tree
+result = renderer.json(mdx={...})
 
-if entry["status"] == "success":
-    rendered = entry["result"]
-    metadata = rendered.get("metadata", {})
-    print("title:", metadata.get("title"))
-    print("html:", rendered.get("output"))
-else:
-    print("error:", entry.get("error"))
-
-# Reuse the same instance for multiple renders with different modes
-result1 = renderer.render(
-    Input(
-        mdx={"page1.mdx": "# Page 1"},
-        settings=Settings(output="html"),
-    )
-)
-
-result2 = renderer.render(
-    Input(
-        mdx={"page2.mdx": "# Page 2"},
-        settings=Settings(output="schema"),
-    )
-)
+# Generic render with output format
+result = renderer.render("html", mdx={...})
 ```
 
-### Accessing Metadata in MDX
-
-Metadata from YAML frontmatter is available via the `context` function:
+## Components
 
 ```python
-result = renderer.render(
-    Input(
-        mdx={
-            "page.mdx": """
----
-title: Welcome
-author: Alice
----
-# {context('title')}
-
-By {context('author')}
-"""
-        },
-        settings=Settings(output="html"),
-    )
+result = renderer.html(
+    mdx={"app.mdx": "# App\n\n<Button>Click me</Button>"},
+    components={
+        "Button": "function Component(props) { return <button>{props.children}</button>; }"
+    },
 )
 ```
 
-The `context` function supports nested paths: `context('author.name')` for nested metadata.
+## Options
 
-### Using Global Utils
+All render methods accept these parameters:
 
-You can inject global JavaScript utilities that are available in all components:
+- `mdx`: Dict mapping filenames to MDX content (required)
+- `components`: Dict mapping component names to code (optional)
+- `utils`: JavaScript utilities code (optional)
+- `minify`: Enable minification (default: True)
+- `directives`: List of directive prefixes for schema extraction (optional)
+
+## Result Object
 
 ```python
-result = renderer.render(
-    Input(
-        mdx={"page.mdx": "<Greeting name='Alice' />"},
-        settings=Settings(
-            output="html",
-            utils="export default { greeting: 'Hello', emoji: '👋' }",
-        ),
-        components={
-            "Greeting": """
-                export default function Component(props) {
-                    return <div>{utils.greeting} {props.name} {utils.emoji}</div>;
-                }
-            """,
-        },
-    )
-)
+result = renderer.html(mdx={...})
+
+# Check success
+result.is_all_success()  # True if all files succeeded
+
+# Get output for a file
+result.get_output("page.mdx")
+
+# Get metadata for a file
+result.get_metadata("page.mdx")
+
+# Access individual files
+result.files["page.mdx"].success
+result.files["page.mdx"].output
+result.files["page.mdx"].metadata
+result.files["page.mdx"].error  # If failed
 ```
 
-The `utils` object must be exported using `export default { ... }` and will be available globally as `utils` in all component code. Invalid utils code is silently ignored.
+## Types
 
-`rendered["output"]` contains HTML, JavaScript, or schema code depending on `settings.output`.
-
-More examples live in `python-bindings/examples/`.
+```python
+from dinja import (
+    Renderer,      # HTTP client class
+    Input,         # Input dataclass
+    Result,        # Batch result dataclass
+    FileResult,    # Individual file result
+    ComponentDefinition,  # Component definition
+    OutputFormat,  # Type alias: "html" | "javascript" | "schema" | "json"
+)
+```
 
 ## License
 
-BSD 3-Clause. See `LICENSE`.
+BSD-3-Clause

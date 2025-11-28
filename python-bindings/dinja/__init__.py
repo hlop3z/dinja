@@ -1,31 +1,27 @@
 """
-Public Python interface for the dinja MDX renderer.
+Dinja - MDX Rendering Client
 
-This shim keeps the top-level `dinja` package pure Python so we can ship
-typing markers while the heavy lifting lives in the `_native` extension
-module compiled with PyO3.
+HTTP client for the Dinja MDX rendering service.
+Connect to the Dinja service running via Docker:
+    docker pull ghcr.io/hlop3z/dinja:latest
+    docker run -p 8080:8080 ghcr.io/hlop3z/dinja:latest
 """
 
 from __future__ import annotations
 
-import time
+import json
 from dataclasses import dataclass, field
-from importlib import import_module
 from typing import Any, Literal
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
-_native = import_module("dinja._native")
-
-_NativeRenderer = _native.Renderer
-
-# Type aliases matching Rust enums
+# Type aliases
 OutputFormat = Literal["html", "javascript", "schema", "json"]
 
 
 @dataclass
 class ComponentDefinition:
     """Component definition with code and metadata.
-
-    Matches the Rust `ComponentDefinition` struct.
 
     Attributes:
         code: Component code (JSX/TSX) - required
@@ -37,61 +33,12 @@ class ComponentDefinition:
     code: str
     name: str | None = None
     docs: str | None = None
-    args: Any | None = None  # serde_json::Value equivalent
-
-    @classmethod
-    def from_name_code(cls, name: str, code: str) -> ComponentDefinition:
-        """Create a ComponentDefinition from name and code.
-
-        Helper function to create a component definition from a simple
-        name-code pair.
-
-        Args:
-            name: Component name
-            code: Component code (JSX/TSX)
-
-        Returns:
-            ComponentDefinition instance with name and code set
-        """
-        return cls(code=code, name=name)
+    args: Any | None = None
 
     @classmethod
     def from_dict(cls, components: dict[str, str]) -> dict[str, ComponentDefinition]:
-        """Create a dictionary of ComponentDefinition from a dict of name->code.
-
-        Helper function to convert a simple dict mapping component names to code
-        strings into the proper format expected by Input.
-
-        Args:
-            components: Dictionary mapping component names to their code strings
-
-        Returns:
-            Dictionary mapping component names to ComponentDefinition instances
-
-        Example:
-            ```python
-            from dinja import Input, Settings, ComponentDefinition
-
-            # Simple dict: name -> code
-            component_dict = {
-                "Button": "function Component(props) { return <button>{props.children}</button>; }",
-                "Card": "function Component(props) { return <div>{props.children}</div>; }",
-            }
-
-            # Convert to proper format
-            components = ComponentDefinition.from_dict(component_dict)
-
-            # Use in Input
-            input_data = Input(
-                mdx={"page.mdx": "# Hello <Button>Click</Button>"},
-                settings=Settings(),
-                components=components,
-            )
-            ```
-        """
-        return {
-            name: cls.from_name_code(name, code) for name, code in components.items()
-        }
+        """Create a dictionary of ComponentDefinition from a dict of name->code."""
+        return {name: cls(code=code, name=name) for name, code in components.items()}
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -106,74 +53,38 @@ class ComponentDefinition:
 
 
 @dataclass
-class Settings:
-    """Rendering settings.
-
-    Matches the Rust `Settings` struct.
-
-    Attributes:
-        output: Output format (default: "html")
-        minify: Enable minification (default: True)
-        utils: Optional JavaScript snippet to inject as global utilities.
-            Must use `export default { ... }` syntax.
-            Example: "export default { greeting: 'Hello', emoji: '👋' }"
-        directives: Optional list of directive prefixes for schema extraction.
-            Used to identify directive attributes.
-            Example: ["v-", "@", "x-"]
-    """
-
-    output: OutputFormat = "html"
-    minify: bool = True
-    utils: str | None = None
-    directives: list[str] | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
-        result: dict[str, Any] = {
-            "output": self.output,
-            "minify": self.minify,
-        }
-        if self.utils is not None:
-            result["utils"] = self.utils
-        if self.directives is not None:
-            result["directives"] = self.directives
-        return result
-
-
-@dataclass
 class Input:
-    """Input structure for batch MDX rendering requests.
-
-    Matches the Rust `NamedMdxBatchInput` struct (aliased as `Input` in Python).
+    """Input structure for MDX rendering requests.
 
     Attributes:
         mdx: Map of file names to MDX content strings - required
-        settings: Rendering settings (default: Settings())
-        components: Optional map of component names to their definitions.
-            Can be a dict[str, str] (name -> code) or dict[str, ComponentDefinition].
-            If dict[str, str] is provided, it will be automatically converted.
+        utils: Optional JavaScript snippet for global utilities (export default { ... })
+        components: Optional map of component names to their definitions
+        minify: Enable minification (default: True)
+        directives: Optional list of directive prefixes for schema extraction
     """
 
     mdx: dict[str, str]
-    settings: Settings = field(default_factory=Settings)
+    utils: str | None = None
     components: dict[str, ComponentDefinition] | dict[str, str] | None = None
+    minify: bool = True
+    directives: list[str] | None = None
 
     def __post_init__(self) -> None:
         """Convert dict[str, str] components to dict[str, ComponentDefinition]."""
         if self.components is not None:
-            # Check if all values are strings (simple name->code dict)
             if all(isinstance(v, str) for v in self.components.values()):
-                # Convert dict[str, str] to dict[str, ComponentDefinition]
                 self.components = ComponentDefinition.from_dict(
                     self.components  # type: ignore[arg-type]
                 )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
-        result: dict[str, Any] = {
-            "settings": self.settings.to_dict(),
-            "mdx": self.mdx,
-        }
+        result: dict[str, Any] = {"mdx": self.mdx, "minify": self.minify}
+        if self.utils is not None:
+            result["utils"] = self.utils
+        if self.directives is not None:
+            result["directives"] = self.directives
         if self.components is not None:
             result["components"] = {
                 name: comp.to_dict() for name, comp in self.components.items()
@@ -181,159 +92,302 @@ class Input:
         return result
 
 
-def _is_v8_isolate_error(error: Exception) -> bool:
-    """Check if exception is a v8 isolate error.
+@dataclass
+class FileResult:
+    """Result for a single rendered file.
 
-    Args:
-        error: Exception to check
-
-    Returns:
-        True if error is related to v8 isolate management
+    Attributes:
+        success: Whether rendering succeeded
+        metadata: Parsed YAML frontmatter (empty dict if none)
+        output: Rendered output (HTML, JS, schema, or JSON depending on format)
+        error: Error message if rendering failed
     """
-    error_type = type(error).__name__
-    error_str = str(error)
-    error_lower = error_str.lower()
-    return (
-        error_type == "PanicException"
-        or "PanicException" in error_str
-        or "v8::OwnedIsolate" in error_str
-        or "v8 isolate" in error_lower
-        or (
-            "isolate" in error_lower
-            and ("panic" in error_lower or "runtime" in error_lower)
+
+    success: bool
+    metadata: dict[str, Any] = field(default_factory=dict)
+    output: str | None = None
+    error: str | None = None
+
+
+@dataclass
+class Result:
+    """Result of a batch render operation.
+
+    Attributes:
+        total: Total number of files processed
+        succeeded: Number of files that rendered successfully
+        failed: Number of files that failed to render
+        files: Dictionary mapping file names to FileResult
+        errors: List of error dictionaries with file and message
+    """
+
+    total: int
+    succeeded: int
+    failed: int
+    files: dict[str, FileResult]
+    errors: list[dict[str, str]] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Result:
+        """Create Result from API response dictionary."""
+        files = {}
+        for name, file_data in data.get("files", {}).items():
+            files[name] = FileResult(
+                success=file_data.get("success", False),
+                metadata=file_data.get("result", {}).get("metadata", {}),
+                output=file_data.get("result", {}).get("output"),
+                error=file_data.get("error"),
+            )
+        return cls(
+            total=data.get("total", 0),
+            succeeded=data.get("succeeded", 0),
+            failed=data.get("failed", 0),
+            files=files,
+            errors=data.get("errors", []),
         )
-    )
+
+    def is_all_success(self) -> bool:
+        """Check if all files rendered successfully."""
+        return self.failed == 0 and self.succeeded == self.total
+
+    def get_output(self, filename: str) -> str | None:
+        """Get output for a specific file."""
+        if filename in self.files:
+            return self.files[filename].output
+        return None
+
+    def get_metadata(self, filename: str) -> dict[str, Any]:
+        """Get metadata for a specific file."""
+        if filename in self.files:
+            return self.files[filename].metadata
+        return {}
+
+
+def _build_request_data(
+    mdx: dict[str, str],
+    components: dict[str, ComponentDefinition] | dict[str, str] | None = None,
+    minify: bool = True,
+    utils: str | None = None,
+    directives: list[str] | None = None,
+) -> dict[str, Any]:
+    """Build request data dictionary from parameters."""
+    # Convert simple component dict to ComponentDefinition
+    if components is not None:
+        if all(isinstance(v, str) for v in components.values()):
+            components = ComponentDefinition.from_dict(components)  # type: ignore
+
+    result: dict[str, Any] = {"mdx": mdx, "minify": minify}
+    if utils is not None:
+        result["utils"] = utils
+    if directives is not None:
+        result["directives"] = directives
+    if components is not None:
+        result["components"] = {
+            name: comp.to_dict() for name, comp in components.items()  # type: ignore
+        }
+    return result
 
 
 class Renderer:
-    """A renderer with automatic retry logic for v8 isolate errors.
-
-    This class wraps the native Renderer and automatically retries on transient
-    v8 isolate errors, which can occur during rapid successive renders or mode switching.
+    """HTTP client for the Dinja MDX rendering service.
 
     Example:
         ```python
-        from dinja import Renderer, Input, Settings
+        from dinja import Renderer
 
-        # Create a renderer with default retry settings (3 retries)
-        renderer = Renderer()
+        # Connect to local Docker service
+        renderer = Renderer("http://localhost:8080")
 
-        # Create a renderer with custom resource limits
-        renderer = Renderer(
-            max_batch_size=500,
-            max_mdx_content_size=5 * 1024 * 1024,  # 5 MB
+        # Render MDX to HTML
+        result = renderer.html(
+            mdx={"page.mdx": "# Hello World"},
+            utils="export default { greeting: 'Hello' }",
         )
 
-        # Option 1: Use dataclasses (type-safe)
-        input_data = Input(
-            mdx={"page.mdx": "# Hello"},
-            settings=Settings(output="html", minify=True),
-        )
-        result = renderer.render(input_data)
-
-        # Option 2: Use dictionaries (backward compatible)
-        result = renderer.render({
-            "settings": {"output": "html"},
-            "mdx": {"page.mdx": "# Hello"},
-        })
+        print(result.get_output("page.mdx"))
         ```
 
     Args:
-        max_retries: Maximum number of retry attempts (default: 3)
-        retry_delay: Initial delay between retries in seconds (default: 0.05)
-        backoff_factor: Multiplier for exponential backoff (default: 1.5)
-        max_cached_renderers: Maximum number of cached renderers (default: 4)
-        max_batch_size: Maximum number of files in a batch request (default: 1000)
-        max_mdx_content_size: Maximum MDX content size per file in bytes (default: 10 MB)
-        max_component_code_size: Maximum component code size in bytes (default: 1 MB)
+        base_url: Base URL of the Dinja service (default: "http://localhost:8080")
+        timeout: Request timeout in seconds (default: 30)
     """
 
     def __init__(
         self,
-        max_retries: int = 3,
-        retry_delay: float = 0.05,
-        backoff_factor: float = 1.5,
-        *,
-        max_cached_renderers: int | None = None,
-        max_batch_size: int | None = None,
-        max_mdx_content_size: int | None = None,
-        max_component_code_size: int | None = None,
+        base_url: str = "http://localhost:8080",
+        timeout: float = 30.0,
     ) -> None:
-        """Initialize the renderer with retry and resource limit configuration."""
-        self._renderer = _NativeRenderer(
-            max_cached_renderers=max_cached_renderers,
-            max_batch_size=max_batch_size,
-            max_mdx_content_size=max_mdx_content_size,
-            max_component_code_size=max_component_code_size,
-        )
-        self.max_retries = max_retries
-        self.retry_delay = retry_delay
-        self.backoff_factor = backoff_factor
+        """Initialize the renderer client."""
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
 
-    def render(self, input: Input | dict[str, Any]) -> dict[str, Any]:
-        """Render MDX content with automatic retry on v8 isolate errors.
+    def _request(self, endpoint: str, data: dict[str, Any]) -> dict[str, Any]:
+        """Make HTTP POST request to the service."""
+        url = f"{self.base_url}{endpoint}"
+        body = json.dumps(data).encode("utf-8")
+        request = Request(
+            url,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=self.timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except HTTPError as e:
+            error_body = e.read().decode("utf-8")
+            try:
+                error_data = json.loads(error_body)
+                raise RuntimeError(error_data.get("error", str(e))) from e
+            except json.JSONDecodeError:
+                raise RuntimeError(f"HTTP {e.code}: {error_body}") from e
+        except URLError as e:
+            raise ConnectionError(f"Failed to connect to {url}: {e.reason}") from e
+
+    def html(
+        self,
+        mdx: dict[str, str],
+        components: dict[str, ComponentDefinition] | dict[str, str] | None = None,
+        minify: bool = True,
+        utils: str | None = None,
+        directives: list[str] | None = None,
+    ) -> Result:
+        """Render MDX to HTML.
 
         Args:
-            input: Either a `Input` dataclass instance or a dictionary
-                containing:
-                - `settings`: Dictionary with `output` ("html", "javascript", "schema", or "json"),
-                  `minify` (bool), and optionally `utils` (str)
-                - `mdx`: Dictionary mapping file names to MDX content strings
-                - `components`: Optional dictionary mapping component names to component definitions
+            mdx: Map of file names to MDX content strings
+            components: Optional map of component names to their definitions
+            minify: Enable minification (default: True)
+            utils: Optional JavaScript snippet for global utilities
+            directives: Optional list of directive prefixes for schema extraction
 
         Returns:
-            Dictionary containing:
-                - `total`: Total number of files processed
-                - `succeeded`: Number of files that rendered successfully
-                - `failed`: Number of files that failed to render
-                - `errors`: List of error dictionaries with `file` and `message` keys
-                - `files`: Dictionary mapping file names to render outcomes
-
-        Raises:
-            ValueError: If the request is invalid after all retries
-            RuntimeError: If an internal error occurs after all retries
+            Result with rendered HTML output
         """
-        # Convert Input to dict if needed
-        if isinstance(input, Input):
-            input_dict = input.to_dict()
-        else:
-            input_dict = input
+        data = _build_request_data(mdx, components, minify, utils, directives)
+        response = self._request("/render/html", data)
+        return Result.from_dict(response)
 
-        last_error: Exception | None = None
-        delay = self.retry_delay
+    def javascript(
+        self,
+        mdx: dict[str, str],
+        components: dict[str, ComponentDefinition] | dict[str, str] | None = None,
+        minify: bool = True,
+        utils: str | None = None,
+        directives: list[str] | None = None,
+    ) -> Result:
+        """Render MDX to JavaScript.
 
-        for attempt in range(self.max_retries + 1):
-            try:
-                return self._renderer.render(input_dict)
-            except Exception as e:
-                last_error = e
-                # Only retry on v8 isolate errors
-                if not _is_v8_isolate_error(e):
-                    # Non-retryable error, raise immediately
-                    raise
+        Args:
+            mdx: Map of file names to MDX content strings
+            components: Optional map of component names to their definitions
+            minify: Enable minification (default: True)
+            utils: Optional JavaScript snippet for global utilities
+            directives: Optional list of directive prefixes for schema extraction
 
-                # If this was the last attempt, raise the error
-                if attempt >= self.max_retries:
-                    break
+        Returns:
+            Result with JavaScript output
+        """
+        data = _build_request_data(mdx, components, minify, utils, directives)
+        response = self._request("/render/javascript", data)
+        return Result.from_dict(response)
 
-                # Wait before retrying with exponential backoff
-                time.sleep(delay)
-                delay *= self.backoff_factor
+    def schema(
+        self,
+        mdx: dict[str, str],
+        components: dict[str, ComponentDefinition] | dict[str, str] | None = None,
+        minify: bool = True,
+        utils: str | None = None,
+        directives: list[str] | None = None,
+    ) -> Result:
+        """Extract schema from MDX (component names).
 
-        # All retries exhausted, raise the last error
-        if last_error is not None:
-            raise last_error
+        Args:
+            mdx: Map of file names to MDX content strings
+            components: Optional map of component names to their definitions
+            minify: Enable minification (default: True)
+            utils: Optional JavaScript snippet for global utilities
+            directives: Optional list of directive prefixes for schema extraction
 
-        # This should never happen, but satisfy type checker
-        raise RuntimeError("Renderer failed without raising an error")
+        Returns:
+            Result with schema output
+        """
+        data = _build_request_data(mdx, components, minify, utils, directives)
+        response = self._request("/render/schema", data)
+        return Result.from_dict(response)
+
+    def json(
+        self,
+        mdx: dict[str, str],
+        components: dict[str, ComponentDefinition] | dict[str, str] | None = None,
+        minify: bool = True,
+        utils: str | None = None,
+        directives: list[str] | None = None,
+    ) -> Result:
+        """Render MDX to JSON tree.
+
+        Args:
+            mdx: Map of file names to MDX content strings
+            components: Optional map of component names to their definitions
+            minify: Enable minification (default: True)
+            utils: Optional JavaScript snippet for global utilities
+            directives: Optional list of directive prefixes for schema extraction
+
+        Returns:
+            Result with JSON tree output
+        """
+        data = _build_request_data(mdx, components, minify, utils, directives)
+        response = self._request("/render/json", data)
+        return Result.from_dict(response)
+
+    def render(
+        self,
+        output: OutputFormat,
+        mdx: dict[str, str],
+        components: dict[str, ComponentDefinition] | dict[str, str] | None = None,
+        minify: bool = True,
+        utils: str | None = None,
+        directives: list[str] | None = None,
+    ) -> Result:
+        """Render MDX with specified output format.
+
+        Args:
+            output: Output format ("html", "javascript", "schema", "json")
+            mdx: Map of file names to MDX content strings
+            components: Optional map of component names to their definitions
+            minify: Enable minification (default: True)
+            utils: Optional JavaScript snippet for global utilities
+            directives: Optional list of directive prefixes for schema extraction
+
+        Returns:
+            Result with rendered output
+        """
+        data = _build_request_data(mdx, components, minify, utils, directives)
+        response = self._request(f"/render/{output}", data)
+        return Result.from_dict(response)
+
+    def health(self) -> bool:
+        """Check if the service is healthy.
+
+        Returns:
+            True if service is healthy, False otherwise
+        """
+        try:
+            url = f"{self.base_url}/health"
+            request = Request(url, method="GET")
+            with urlopen(request, timeout=self.timeout) as response:
+                data = json.loads(response.read().decode("utf-8"))
+                return data.get("status") == "ok"
+        except Exception:
+            return False
 
 
 # Export all public types and classes
 __all__ = [
     "Renderer",
-    "_NativeRenderer",
-    "OutputFormat",
-    "ComponentDefinition",
-    "Settings",
     "Input",
+    "Result",
+    "FileResult",
+    "ComponentDefinition",
+    "OutputFormat",
 ]

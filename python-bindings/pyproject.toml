@@ -1,13 +1,18 @@
 [project]
 name = "dinja"
-version = "0.4.3"
-description = "Safe, deterministic MDX rendering powered by a Rust core with batteries-included Python bindings"
+dynamic = ["version"]
+description = "HTTP client for the Dinja MDX rendering service"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 classifiers = [
-    "Programming Language :: Rust",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
 ]
 authors = [
     { name = "hlop3z", email = "23062270+hlop3z@users.noreply.github.com" },
@@ -16,17 +21,26 @@ license = { text = "BSD-3-Clause" }
 
 [project.urls]
 Homepage = "https://github.com/hlop3z/dinja"
+Documentation = "https://github.com/hlop3z/dinja#readme"
+Repository = "https://github.com/hlop3z/dinja"
+Issues = "https://github.com/hlop3z/dinja/issues"
 
 [build-system]
-requires = ["maturin>=1.0,<2.0"]
-build-backend = "maturin"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.maturin]
-module-name = "dinja._native"
-bindings = "pyo3"
+[tool.hatch.version]
+path = "dinja/__about__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dinja"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/dinja",
+]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.1",
+    "pytest>=8.0.0",
 ]
-# compatibility = ["linux", "macos", "windows"]

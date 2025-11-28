@@ -94,6 +94,41 @@ pub struct NamedMdxBatchInput {
     pub components: Option<HashMap<String, ComponentDefinition>>,
 }
 
+/// Simplified input for /render/{output} endpoints
+#[derive(Deserialize, Serialize)]
+pub struct RenderInput {
+    /// Map of file names to MDX content strings
+    pub mdx: HashMap<String, String>,
+    /// Optional JavaScript snippet for global utils (export default { ... })
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub utils: Option<String>,
+    /// Optional map of component names to their definitions
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub components: Option<HashMap<String, ComponentDefinition>>,
+    /// Enable minification (default: true)
+    #[serde(default = "default_minify_true")]
+    pub minify: bool,
+    /// Optional directive prefixes for schema extraction (e.g., ["v-", "@", "x-"])
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub directives: Option<Vec<String>>,
+}
+
+impl RenderInput {
+    /// Convert to NamedMdxBatchInput with the specified output format
+    pub fn into_batch_input(self, output: OutputFormat) -> NamedMdxBatchInput {
+        NamedMdxBatchInput {
+            settings: RenderSettings {
+                output,
+                minify: self.minify,
+                utils: self.utils,
+                directives: self.directives,
+            },
+            mdx: self.mdx,
+            components: self.components,
+        }
+    }
+}
+
 /// Output structure containing rendered output and metadata
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RenderedMdx {

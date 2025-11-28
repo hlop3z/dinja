@@ -1,6 +1,6 @@
 # @dinja/core
 
-Fast MDX renderer with component support - JavaScript bindings powered by a Rust core.
+HTTP client for the Dinja MDX rendering service.
 
 ## Installation
 
@@ -12,311 +12,141 @@ yarn add @dinja/core
 pnpm add @dinja/core
 ```
 
+## Requirements
+
+Start the Dinja service via Docker:
+
+```bash
+docker pull ghcr.io/hlop3z/dinja:latest
+docker run -p 8080:8080 ghcr.io/hlop3z/dinja:latest
+```
+
 ## Usage
 
 ### Basic Example
 
-```javascript
-import { Renderer } from '@dinja/core';
+```typescript
+import { Renderer, isAllSuccess, getOutput } from '@dinja/core';
 
-// Create a renderer instance (engine loads once)
-const renderer = new Renderer();
+// Connect to the service
+const renderer = new Renderer({ baseUrl: 'http://localhost:8080' });
 
-// Render MDX content
-const result = renderer.render({
-  settings: {
-    output: 'html',
-    minify: false
-  },
-  mdx: {
-    'example.mdx': '# Hello **dinja**'
-  }
+// Check health
+if (await renderer.health()) {
+  console.log('Service is running!');
+}
+
+// Render MDX to HTML
+const result = await renderer.html({
+  mdx: { 'page.mdx': '# Hello World\n\nThis is **bold** text.' },
+  utils: "export default { greeting: 'Hello' }",
 });
 
-console.log(result);
-// {
-//   total: 1,
-//   succeeded: 1,
-//   failed: 0,
-//   errors: [],
-//   files: {
-//     'example.mdx': {
-//       success: true,
-//       output: '<h1>Hello <strong>dinja</strong></h1>'
-//     }
-//   }
-// }
+// Get the output
+console.log(getOutput(result, 'page.mdx'));
+// Output: <h1>Hello World</h1><p>This is <strong>bold</strong> text.</p>
 ```
 
-### TypeScript Example
+### Render Methods
 
 ```typescript
-import { Renderer, RenderInput, RenderResult } from '@dinja/core';
+// Render to HTML
+const result = await renderer.html({ mdx: {...} });
 
-const renderer = new Renderer();
+// Render to JavaScript
+const result = await renderer.javascript({ mdx: {...} });
 
-const input: RenderInput = {
-  settings: {
-    output: 'html',
-    minify: true
-  },
-  mdx: {
-    'page.mdx': '# Welcome to dinja'
-  }
-};
+// Extract schema (component names)
+const result = await renderer.schema({ mdx: {...} });
 
-const result: RenderResult = renderer.render(input);
+// Render to JSON tree
+const result = await renderer.json({ mdx: {...} });
 
-if (result.files['page.mdx'].success) {
-  console.log(result.files['page.mdx'].output);
-}
+// Generic render with output format
+const result = await renderer.render('html', { mdx: {...} });
 ```
 
-### Output Formats
+### Components
 
-The renderer supports multiple output formats:
-
-```javascript
-import { Renderer } from '@dinja/core';
-
-const renderer = new Renderer();
-
-// HTML output
-renderer.render({
-  settings: { output: 'html', minify: false },
-  mdx: { 'file.mdx': '# Hello' }
-});
-
-// JavaScript output (executable code)
-renderer.render({
-  settings: { output: 'javascript', minify: false },
-  mdx: { 'file.mdx': '# Hello' }
-});
-
-// Schema output (AST)
-renderer.render({
-  settings: { output: 'schema', minify: false },
-  mdx: { 'file.mdx': '# Hello' }
-});
-
-// JSON output (schema as JSON string)
-renderer.render({
-  settings: { output: 'json', minify: false },
-  mdx: { 'file.mdx': '# Hello' }
-});
-```
-
-### Custom Components
-
-```javascript
-import { Renderer } from '@dinja/core';
-
-const renderer = new Renderer();
-
-const result = renderer.render({
-  settings: { output: 'html', minify: false },
-  mdx: {
-    'app.mdx': `
-import { Button } from './button';
-
-<Button>Click me</Button>
-    `
-  },
+```typescript
+const result = await renderer.html({
+  mdx: { 'app.mdx': '# App\n\n<Button>Click me</Button>' },
   components: {
-    Button: `
-export default function Component({ children }) {
-  return <button class="custom-btn">{children}</button>;
-}
-    `,
+    Button: 'function Component(props) { return <button>{props.children}</button>; }',
   },
 });
 ```
 
-### Batch Rendering
+### Input Options
 
-The renderer efficiently handles multiple files in a single call:
+All render methods accept an `Input` object with:
 
-```javascript
-import { Renderer } from '@dinja/core';
+- `mdx`: Record mapping filenames to MDX content (required)
+- `components`: Record mapping component names to code (optional)
+- `utils`: JavaScript utilities code (optional)
+- `minify`: Enable minification (default: true)
+- `directives`: Array of directive prefixes for schema extraction (optional)
 
-const renderer = new Renderer();
+### Result Object
 
-const result = renderer.render({
-  settings: { output: 'html', minify: false },
-  mdx: {
-    'page1.mdx': '# Page 1',
-    'page2.mdx': '# Page 2',
-    'page3.mdx': '# Page 3'
-  }
-});
+```typescript
+const result = await renderer.html({ mdx: {...} });
 
-console.log(`Rendered ${result.succeeded} out of ${result.total} files`);
+// Check success
+isAllSuccess(result);  // true if all files succeeded
 
-// Access individual results
-for (const [filename, outcome] of Object.entries(result.files)) {
-  if (outcome.success) {
-    console.log(`${filename}: ${outcome.output}`);
-  } else {
-    console.error(`${filename} failed: ${outcome.error}`);
-  }
-}
+// Get output for a file
+getOutput(result, 'page.mdx');
+
+// Get metadata for a file
+getMetadata(result, 'page.mdx');
+
+// Access individual files
+result.files['page.mdx'].success;
+result.files['page.mdx'].result?.output;
+result.files['page.mdx'].result?.metadata;
+result.files['page.mdx'].error;  // If failed
 ```
-
-### Reusable Renderer Instance
-
-The `Renderer` class maintains a single render service instance and reuses it across multiple renders, which prevents V8 isolate issues and improves performance:
-
-```javascript
-import { Renderer } from '@dinja/core';
-
-const renderer = new Renderer();
-
-// First render with HTML output
-const html = renderer.render({
-  settings: { output: 'html', minify: false },
-  mdx: { 'page.mdx': '# Hello' }
-});
-
-// Second render with schema output (reuses same instance)
-const schema = renderer.render({
-  settings: { output: 'schema', minify: false },
-  mdx: { 'page.mdx': '# World' }
-});
-```
-
-### Using Global Utils
-
-Inject global JavaScript utilities available in all components:
-
-```javascript
-import { Renderer } from '@dinja/core';
-
-const renderer = new Renderer();
-
-const result = renderer.render({
-  settings: {
-    output: 'html',
-    minify: false,
-    utils: "export default { greeting: 'Hello', emoji: '👋' }",
-  },
-  mdx: {
-    'page.mdx': '<Greeting name="Alice" />',
-  },
-  components: {
-    Greeting: `
-      export default function Component(props) {
-        return <div>{utils.greeting} {props.name} {utils.emoji}</div>;
-      }
-    `,
-  },
-});
-```
-
-The `utils` object must be exported using `export default { ... }` and will be available globally as `utils` in all component code. Invalid utils code is silently ignored.
 
 ## API Reference
 
-### `Renderer`
-
-#### Constructor
+### Types
 
 ```typescript
-new Renderer(config?: RendererConfig)
+import {
+  Renderer,           // HTTP client class
+  Input,              // Input interface
+  Result,             // Batch result interface
+  FileResult,         // Individual file result
+  ComponentDefinition, // Component definition
+  OutputFormat,       // Type: "html" | "javascript" | "schema" | "json"
+  RendererConfig,     // Renderer configuration
+  isAllSuccess,       // Helper function
+  getOutput,          // Helper function
+  getMetadata,        // Helper function
+} from '@dinja/core';
 ```
 
-Creates a new Renderer instance. The engine is loaded once during initialization and reused for all subsequent renders.
+### Renderer Configuration
 
-**Optional config:**
-- `maxCachedRenderers`: Maximum number of cached renderers (default: 4)
-- `maxBatchSize`: Maximum number of files in a batch request (default: 1000)
-- `maxMdxContentSize`: Maximum MDX content size per file in bytes (default: 10 MB)
-- `maxComponentCodeSize`: Maximum component code size in bytes (default: 1 MB)
-
-```javascript
-// With custom limits
+```typescript
 const renderer = new Renderer({
-  maxBatchSize: 500,
-  maxMdxContentSize: 5 * 1024 * 1024, // 5 MB
+  baseUrl: 'http://localhost:8080',  // Default
+  timeout: 30000,                    // Timeout in milliseconds (default: 30000)
 });
-```
-
-#### `render(input: RenderInput): RenderResult`
-
-Renders MDX content.
-
-**Parameters:**
-- `input.settings` - Render settings
-  - `output`: `'html' | 'javascript' | 'schema' | 'json'` - Output format
-  - `minify`: `boolean` - Whether to minify the output
-  - `utils`: `string` (optional) - JavaScript snippet to inject as global utilities (must use `export default { ... }`)
-- `input.mdx` - Map of file names to MDX content strings
-- `input.components` - Optional map of component names to definitions
-
-**Returns:** `RenderResult` containing:
-- `total`: Total number of files processed
-- `succeeded`: Number of files that rendered successfully
-- `failed`: Number of files that failed to render
-- `errors`: Array of error objects with `file` and `message` properties
-- `files`: Map of file names to render outcomes
-
-**Throws:** `Error` if the request is invalid or an internal error occurs
-
-## Requirements
-
-- Node.js >= 18
-- **Server-side only** - This package uses native Node.js addons and cannot be bundled for browser use
-
-## Important: Server-Side Only
-
-This package contains native `.node` binaries and is designed for **server-side Node.js environments only**. It cannot be used in:
-
-- Browser bundles (Webpack, Vite, esbuild, Rollup, etc.)
-- Edge runtimes (Cloudflare Workers, Vercel Edge)
-- Browser-based environments
-
-### Using with Vite/Next.js
-
-If you're using Vite or Next.js, ensure the package is only imported in server-side code:
-
-```javascript
-// ✅ Correct: Server-side only (API routes, SSR, etc.)
-// pages/api/render.js or app/api/render/route.js
-import { Renderer } from '@dinja/core';
-
-export async function POST(request) {
-  const renderer = new Renderer();
-  // ... render MDX server-side
-}
-
-// ❌ Wrong: Client-side code (will fail to bundle)
-// components/MyComponent.jsx
-import { Renderer } from '@dinja/core'; // Error: No loader for .node files
-```
-
-For Vite projects, you may need to exclude it from optimization:
-
-```javascript
-// vite.config.js
-export default {
-  optimizeDeps: {
-    exclude: ['@dinja/core']
-  },
-  ssr: {
-    noExternal: ['@dinja/core']
-  }
-}
 ```
 
 ## Platform Support
 
-Pre-built binaries are provided for:
-- Windows (x64)
-- macOS (x64, ARM64)
-- Linux (x64 glibc)
+Works in any JavaScript runtime that supports `fetch`:
+- Node.js >= 18
+- Deno
+- Bun
+- Browser (with CORS support)
 
 ## License
 
-BSD 3-Clause. See `LICENSE`.
+BSD-3-Clause
 
 ## Links
 

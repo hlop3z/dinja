@@ -1,18 +1,25 @@
 {
   "name": "@dinja/core",
   "version": "0.4.3",
-  "description": "Fast MDX renderer with component support - JavaScript bindings",
-  "main": "wrapper.js",
-  "types": "index.d.ts",
+  "description": "HTTP client for the Dinja MDX rendering service",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
   "keywords": [
     "mdx",
     "markdown",
     "jsx",
     "react",
     "renderer",
-    "napi",
-    "rust",
-    "performance"
+    "http",
+    "client"
   ],
   "license": "BSD-3-Clause",
   "repository": {
@@ -25,32 +32,18 @@
   },
   "homepage": "https://github.com/hlop3z/dinja/tree/main/js-bindings#readme",
   "files": [
-    "index.js",
-    "wrapper.js",
-    "index.d.ts",
-    "*.node"
+    "dist"
   ],
-  "napi": {
-    "binaryName": "dinja-js-bindings",
-    "targets": [
-      "x86_64-pc-windows-msvc",
-      "x86_64-apple-darwin",
-      "x86_64-unknown-linux-gnu",
-      "aarch64-apple-darwin"
-    ]
-  },
   "engines": {
     "node": ">= 18"
   },
   "scripts": {
-    "artifacts": "napi artifacts",
-    "build": "napi build --platform --release",
-    "build:debug": "napi build --platform",
+    "build": "tsup src/index.ts --format cjs,esm --dts",
     "test": "node --test test/*.test.js",
-    "universal": "napi universal",
-    "version": "napi version"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^3.4.1"
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0"
   }
 }
