@@ -368,60 +368,27 @@ fn restore_jsx_components(content: &str, placeholders: &HashMap<String, String>)
     result
 }
 
-/// Unwraps the first Fragment wrapper from HTML output if present.
+/// Removes all Fragment tags from HTML output.
 ///
-/// If the HTML starts with `<Fragment>` and ends with `</Fragment>`, this function
-/// extracts only the children content, removing the Fragment wrapper.
-///
-/// This handles the case where MDX content is wrapped in a Fragment by default,
-/// and we only want to return the actual content without the wrapper.
+/// Fragment tags (`<Fragment>` and `</Fragment>`) are virtual wrappers used in JSX
+/// that should not appear in the final HTML output. This function strips all
+/// occurrences of Fragment tags while preserving their children content.
 ///
 /// # Arguments
-/// * `html` - HTML string that may be wrapped in a Fragment
+/// * `html` - HTML string that may contain Fragment tags
 ///
 /// # Returns
-/// HTML string with Fragment wrapper removed if present, otherwise unchanged
+/// HTML string with all Fragment tags removed
 fn unwrap_fragment(html: &str) -> String {
+    // Static regex pattern compiled once at first use
+    // Matches: <Fragment>, <Fragment ...attrs>, </Fragment>, </fragment> (case-insensitive)
+    static FRAGMENT_PATTERN: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r"(?i)</?Fragment[^>]*>").expect("Invalid fragment regex")
+    });
+
     let trimmed = html.trim();
-
-    // Check if the HTML starts with <Fragment (case-insensitive, allowing attributes)
-    let fragment_start_patterns = ["<Fragment", "<fragment"];
-    let mut fragment_start: Option<usize> = None;
-
-    for pattern in &fragment_start_patterns {
-        if let Some(pos) = trimmed.find(pattern) {
-            fragment_start = Some(pos);
-            break;
-        }
-    }
-
-    if let Some(start) = fragment_start {
-        // Find the closing > of the opening tag (handle self-closing or with attributes)
-        if let Some(tag_end) = trimmed[start..].find('>') {
-            let tag_end = start + tag_end + 1;
-            let content_start = tag_end;
-
-            // Find the closing </Fragment> tag (case-insensitive)
-            let remaining = &trimmed[content_start..];
-            let fragment_end_patterns = ["</Fragment>", "</fragment>"];
-            let mut fragment_end: Option<usize> = None;
-
-            for pattern in &fragment_end_patterns {
-                if let Some(pos) = remaining.rfind(pattern) {
-                    fragment_end = Some(pos);
-                    break;
-                }
-            }
-
-            if let Some(end_pos) = fragment_end {
-                // Extract just the content between the tags
-                return remaining[..end_pos].trim().to_string();
-            }
-        }
-    }
-
-    // No Fragment wrapper found, return as-is
-    html.to_string()
+    let result = FRAGMENT_PATTERN.replace_all(trimmed, "");
+    result.into_owned()
 }
 
 fn render_markdown(content: &str) -> Result<String, MdxError> {
@@ -952,5 +919,63 @@ Some text
         // Lowercase tags with expressions might still get caught, but the pattern
         // specifically looks for uppercase component names
         assert!(placeholders.is_empty() || !placeholders.values().any(|v| v.starts_with("<div")));
+    }
+
+    // Tests for unwrap_fragment function
+
+    #[test]
+    fn test_unwrap_fragment_no_fragments() {
+        // HTML without Fragment tags should be returned unchanged (just trimmed)
+        let html = "<h1>Hello</h1><p>World</p>";
+        let result = unwrap_fragment(html);
+        assert_eq!(result, html);
+    }
+
+    #[test]
+    fn test_unwrap_fragment_single_fragment() {
+        // Single Fragment wrapper should be removed
+        let html = "<Fragment><h1>Hello</h1></Fragment>";
+        let result = unwrap_fragment(html);
+        assert_eq!(result, "<h1>Hello</h1>");
+    }
+
+    #[test]
+    fn test_unwrap_fragment_nested_fragments() {
+        // Multiple/nested Fragment tags should all be removed
+        let html = "<Fragment><h1>Title</h1><Fragment><p>Content</p></Fragment></Fragment>";
+        let result = unwrap_fragment(html);
+        assert_eq!(result, "<h1>Title</h1><p>Content</p>");
+    }
+
+    #[test]
+    fn test_unwrap_fragment_case_insensitive() {
+        // Should handle case variations
+        let html = "<FRAGMENT><h1>Hello</h1></FRAGMENT>";
+        let result = unwrap_fragment(html);
+        assert_eq!(result, "<h1>Hello</h1>");
+    }
+
+    #[test]
+    fn test_unwrap_fragment_with_attributes() {
+        // Fragment with attributes (though rare) should still be removed
+        let html = "<Fragment key=\"1\"><h1>Hello</h1></Fragment>";
+        let result = unwrap_fragment(html);
+        assert_eq!(result, "<h1>Hello</h1>");
+    }
+
+    #[test]
+    fn test_unwrap_fragment_preserves_whitespace_inside() {
+        // Content whitespace should be preserved
+        let html = "<Fragment>\n  <h1>Hello</h1>\n</Fragment>";
+        let result = unwrap_fragment(html);
+        assert_eq!(result, "\n  <h1>Hello</h1>\n");
+    }
+
+    #[test]
+    fn test_unwrap_fragment_trims_outer_whitespace() {
+        // Outer whitespace should be trimmed
+        let html = "  \n<h1>Hello</h1>\n  ";
+        let result = unwrap_fragment(html);
+        assert_eq!(result, "<h1>Hello</h1>");
     }
 }

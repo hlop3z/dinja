@@ -630,3 +630,88 @@ Welcome to our amazing website! This is a simple demo of MDX rendering.
         html
     );
 }
+
+#[test]
+fn test_component_with_fragment() {
+    // Tests that components using JSX Fragments (<>...</>) render correctly
+    // without leaving <Fragment> tags in the output
+    let service = create_test_service();
+
+    let mut mdx_files = HashMap::new();
+    let mdx_content = create_mdx_with_frontmatter(
+        "Test",
+        r#"# Test
+
+<Card title="Hello" subtitle="World" />
+"#,
+    );
+    mdx_files.insert("fragment.mdx".to_string(), mdx_content);
+
+    // Component that uses Fragment to return multiple elements
+    let mut components = HashMap::new();
+    components.insert(
+        "Card".to_string(),
+        dinja_core::models::ComponentDefinition {
+            name: Some("Card".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export function Component(props) {
+  const { title, subtitle } = props;
+  return (
+    <>
+      <h1>Title: {title}</h1>
+      <hr />
+      <h3>Subtitle: {subtitle}</h3>
+    </>
+  );
+}"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service
+        .render_batch(&input)
+        .expect("Failed to render batch");
+
+    assert!(outcome.is_all_success());
+
+    let file_outcome = outcome.files.get("fragment.mdx").expect("File not found");
+    let result = file_outcome
+        .result
+        .as_ref()
+        .expect("Result should be present");
+
+    let html = result.output.as_ref().expect("Output should be present");
+    println!("Fragment component output:\n{}", html);
+
+    // Fragment tags should NOT appear in output
+    assert!(
+        !html.contains("<Fragment") && !html.contains("</Fragment>"),
+        "Fragment tags should be stripped from output: {}",
+        html
+    );
+
+    // The actual content should be present
+    assert!(
+        html.contains("Title: Hello"),
+        "Should contain title: {}",
+        html
+    );
+    assert!(
+        html.contains("Subtitle: World"),
+        "Should contain subtitle: {}",
+        html
+    );
+    assert!(html.contains("<hr"), "Should contain hr element: {}", html);
+}
