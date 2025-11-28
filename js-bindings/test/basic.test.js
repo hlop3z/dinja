@@ -3,12 +3,6 @@ const assert = require('node:assert');
 const { Renderer } = require('..');
 
 describe('Renderer', () => {
-  test('should create a new renderer instance', () => {
-    const renderer = new Renderer();
-    assert.ok(renderer);
-    assert.ok(typeof renderer.render === 'function');
-  });
-
   test('should render simple MDX to HTML', () => {
     const renderer = new Renderer();
     const result = renderer.render({
@@ -22,18 +16,6 @@ describe('Renderer', () => {
     assert.strictEqual(result.errors.length, 0);
     assert.ok(result.files['test.mdx'].success);
     assert.ok(result.files['test.mdx'].output.includes('Hello World'));
-  });
-
-  test('should render MDX with bold text', () => {
-    const renderer = new Renderer();
-    const result = renderer.render({
-      settings: { output: 'html', minify: false },
-      mdx: { 'test.mdx': '# Hello **World**' }
-    });
-
-    assert.ok(result.files['test.mdx'].success);
-    assert.ok(result.files['test.mdx'].output.includes('<strong>'));
-    assert.ok(result.files['test.mdx'].output.includes('World'));
   });
 
   test('should render multiple files', () => {

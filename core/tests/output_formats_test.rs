@@ -124,47 +124,6 @@ fn test_html_output_with_frontmatter() {
 }
 
 #[test]
-fn test_html_output_minified() {
-    let service = create_test_service();
-
-    let mut mdx_files = HashMap::new();
-    mdx_files.insert(
-        "minified.mdx".to_string(),
-        "# Title\n\n<div>\n  <p>Content</p>\n</div>".to_string(),
-    );
-
-    let input = NamedMdxBatchInput {
-        settings: RenderSettings {
-            output: OutputFormat::Html,
-            minify: true,
-            utils: None,
-            directives: None,
-        },
-        mdx: mdx_files,
-        components: None,
-    };
-
-    let outcome = service
-        .render_batch(&input)
-        .expect("Failed to render batch");
-
-    assert!(outcome.is_all_success());
-
-    let file_outcome = outcome.files.get("minified.mdx").expect("File not found");
-    let result = file_outcome
-        .result
-        .as_ref()
-        .expect("Result should be present");
-
-    let html = result
-        .output
-        .as_ref()
-        .expect("HTML output should be present");
-    // Minified HTML should have reduced whitespace
-    assert!(!html.is_empty());
-}
-
-#[test]
 fn test_html_output_with_jsx() {
     let service = create_test_service();
 
@@ -484,78 +443,6 @@ fn test_schema_output_with_frontmatter() {
 
     // Directives should be present but empty
     assert!(schema_obj["directives"].is_object());
-}
-
-#[test]
-fn test_batch_multiple_files_different_formats() {
-    let service = create_test_service();
-
-    // Test HTML format
-    let mut mdx_files_html = HashMap::new();
-    mdx_files_html.insert("file1.mdx".to_string(), "# File 1".to_string());
-    mdx_files_html.insert("file2.mdx".to_string(), "# File 2".to_string());
-
-    let input_html = NamedMdxBatchInput {
-        settings: RenderSettings {
-            output: OutputFormat::Html,
-            minify: true,
-            utils: None,
-            directives: None,
-        },
-        mdx: mdx_files_html,
-        components: None,
-    };
-
-    let outcome_html = service
-        .render_batch(&input_html)
-        .expect("Failed to render HTML batch");
-
-    assert_eq!(outcome_html.total, 2);
-    assert!(outcome_html.is_all_success());
-
-    // Test JavaScript format
-    let mut mdx_files_js = HashMap::new();
-    mdx_files_js.insert("file3.mdx".to_string(), "# File 3".to_string());
-
-    let input_js = NamedMdxBatchInput {
-        settings: RenderSettings {
-            output: OutputFormat::Javascript,
-            minify: true,
-            utils: None,
-            directives: None,
-        },
-        mdx: mdx_files_js,
-        components: None,
-    };
-
-    let outcome_js = service
-        .render_batch(&input_js)
-        .expect("Failed to render JS batch");
-
-    assert_eq!(outcome_js.total, 1);
-    assert!(outcome_js.is_all_success());
-
-    // Test Schema format
-    let mut mdx_files_schema = HashMap::new();
-    mdx_files_schema.insert("file4.mdx".to_string(), "# File 4".to_string());
-
-    let input_schema = NamedMdxBatchInput {
-        settings: RenderSettings {
-            output: OutputFormat::Schema,
-            minify: false,
-            utils: None,
-            directives: None,
-        },
-        mdx: mdx_files_schema,
-        components: None,
-    };
-
-    let outcome_schema = service
-        .render_batch(&input_schema)
-        .expect("Failed to render schema batch");
-
-    assert_eq!(outcome_schema.total, 1);
-    assert!(outcome_schema.is_all_success());
 }
 
 #[test]

@@ -25,7 +25,6 @@ toml = { version = "0.9.8", optional = true }
 
 # deno_core for JavaScript execution
 deno_core = "0.315.0"
-tokio = { version = "1.42", features = ["full"] }
 
 # gray_matter for YAML frontmatter parsing
 gray_matter = "0.3.2"

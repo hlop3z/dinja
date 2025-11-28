@@ -702,7 +702,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.17",
- "tokio",
  "toml",
 ]
 
@@ -717,7 +716,6 @@ dependencies = [
  "once_cell",
  "serde",
  "serde_json",
- "tokio",
 ]
 
 [[package]]

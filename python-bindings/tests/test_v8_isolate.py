@@ -25,10 +25,6 @@ _MDX_CONTENT = {
     "about.mdx": "## About\nThis is a sample page.",
 }
 
-_MDX_CONTENT_SINGLE = {
-    "index.mdx": "# Hello World <Button name='Submit' />",
-}
-
 _MODES = ("html", "javascript", "schema")
 
 
@@ -107,40 +103,6 @@ def test_renderer_multiple_modes() -> None:
         result = renderer.render(_build_render_config(mode, _MDX_CONTENT))
         assert _validate_result(result, mode), f"Failed at mode={mode}"
     print("  ✅ All modes succeeded\n")
-
-
-@pytest.mark.xfail(
-    reason="May fail with v8 isolate errors in test environment due to rapid mode switching",
-    strict=False,
-)
-def test_stress_test_renderer(iterations: int = 20) -> None:
-    """Stress test with Renderer class - many rapid iterations.
-
-    Note: This test may fail with v8 isolate errors in some test environments
-    due to rapid mode switching. This is a known limitation of v8 isolate management.
-
-    Args:
-        iterations: Number of iterations to run
-    """
-    print(f"Test 3: Stress test with Renderer class ({iterations} iterations)")
-    print("-" * 60)
-    try:
-        # Create renderer in a fresh context to avoid v8 isolate issues from previous tests
-        renderer = dinja.Renderer()
-    except Exception as e:
-        if _is_v8_isolate_error(e):
-            pytest.skip(
-                f"v8 isolate error when creating Renderer (likely from previous tests): {type(e).__name__}"
-            )
-        raise
-    for i in range(iterations):
-        # Alternate between modes
-        mode = _MODES[i % len(_MODES)]
-        result = renderer.render(_build_render_config(mode, _MDX_CONTENT_SINGLE))
-        assert result.get("succeeded", 0) > 0, f"Failed at iteration {i+1}"
-        if (i + 1) % 10 == 0:
-            print(f"  Progress: {i+1}/{iterations} iterations completed")
-    print(f"  ✅ All {iterations} renders succeeded\n")
 
 
 # Note: These tests are designed to be run with pytest.

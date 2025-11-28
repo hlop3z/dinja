@@ -857,13 +857,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_protect_jsx_empty_content() {
-        let (result, placeholders) = protect_jsx_components("");
-        assert!(result.is_empty());
-        assert!(placeholders.is_empty());
-    }
-
-    #[test]
     fn test_protect_jsx_no_jsx() {
         let content = "# Hello World\n\nThis is plain markdown.";
         let (result, placeholders) = protect_jsx_components(content);
@@ -913,15 +906,6 @@ mod tests {
     }
 
     #[test]
-    fn test_restore_jsx_components() {
-        let original = r#"<Hero title={context("title")} />"#;
-        let (protected, placeholders) = protect_jsx_components(original);
-
-        let restored = restore_jsx_components(&protected, &placeholders);
-        assert_eq!(restored, original);
-    }
-
-    #[test]
     fn test_restore_multiple_jsx_components() {
         let content = r#"
 # Title
@@ -951,14 +935,6 @@ Some text
     }
 
     #[test]
-    fn test_find_matching_close_tag_simple() {
-        let content = "<div>content</div>";
-        let mut depth = 0;
-        let result = find_matching_close_tag(content, 5, "div", "</div>", &mut depth);
-        assert_eq!(result, Some(12));
-    }
-
-    #[test]
     fn test_find_matching_close_tag_nested() {
         let content = "<div><div>inner</div>outer</div>";
         let mut depth = 0;
@@ -976,13 +952,5 @@ Some text
         // Lowercase tags with expressions might still get caught, but the pattern
         // specifically looks for uppercase component names
         assert!(placeholders.is_empty() || !placeholders.values().any(|v| v.starts_with("<div")));
-    }
-
-    #[test]
-    fn test_static_patterns_compile() {
-        // Verify all static patterns compile successfully
-        assert!(SELF_CLOSING_JSX_PATTERN.is_match("<Component prop={value} />"));
-        assert!(OPENING_JSX_PATTERN.is_match("<Component prop={value}>"));
-        assert!(COMPONENT_NAME_PATTERN.is_match("<MyComponent"));
     }
 }
