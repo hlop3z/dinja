@@ -443,23 +443,23 @@ fn render_markdown(content: &str) -> Result<String, MdxError> {
     Ok(escape_code_block_braces(&restored))
 }
 
-/// Escapes curly braces inside `<code>` and `<pre>` blocks to prevent JSX interpretation.
+/// Escapes curly braces inside `<code>` blocks to prevent JSX interpretation.
 ///
 /// Code blocks from markdown contain literal code which may include `{` and `}` characters.
 /// These must be escaped as `{'{'}` and `{'}'}` in JSX to be treated as literal text.
+///
+/// Note: We only match `<code>` tags (not `<pre>`) because markdown generates
+/// `<pre><code>...</code></pre>` structure, and the actual code content is inside `<code>`.
 ///
 /// # Example
 /// Input:  `<code>console.log(${name});</code>`
 /// Output: `<code>console.log(${'{'}'name'{'}');</code>`
 fn escape_code_block_braces(html: &str) -> String {
-    // Match content inside <code>...</code> and <pre>...</pre> tags
-    // We process these separately to avoid escaping braces in JSX attributes
-
-    // Pattern to match code/pre blocks: <code>content</code> or <pre>content</pre>
-    // Also handles: <code class="...">content</code>
+    // Match content inside <code>...</code> tags only
+    // Markdown generates: <pre><code class="language-xxx">content</code></pre>
+    // We target <code> specifically since that's where the actual code content lives
     static CODE_BLOCK_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?s)(<(?:code|pre)[^>]*>)(.*?)(</(?:code|pre)>)")
-            .expect("hardcoded regex pattern is valid")
+        Regex::new(r"(?s)(<code[^>]*>)(.*?)(</code>)").expect("hardcoded regex pattern is valid")
     });
 
     CODE_BLOCK_PATTERN

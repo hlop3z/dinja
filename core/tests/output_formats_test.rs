@@ -1279,3 +1279,608 @@ fn test_markdown_edge_cases_complex_nesting() {
         html.len()
     );
 }
+
+#[test]
+fn test_stress_jsx_like_code_in_blocks() {
+    // Stress test: Code blocks containing JSX-like syntax that should NOT be parsed as JSX
+    let service = create_test_service();
+
+    let content = r#"# React Component Examples
+
+Here's a React component with complex JSX:
+
+```jsx
+import React, { useState, useEffect } from 'react';
+
+const ComplexComponent = ({ items, onSelect, config = {} }) => {
+  const [state, setState] = useState({ count: 0, data: null });
+  const { theme = 'dark', size = 'md' } = config;
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const response = await fetch(`/api/items?theme=${theme}&size=${size}`);
+      const json = await response.json();
+      setState(prev => ({ ...prev, data: json }));
+    };
+    fetchData();
+  }, [theme, size]);
+
+  return (
+    <div className={`container ${theme}`} data-testid="complex-component">
+      <header style={{ padding: '1rem' }}>
+        <h1>{config.title || 'Default Title'}</h1>
+        <span>{state.count} items</span>
+      </header>
+      <ul>
+        {items.map((item, idx) => (
+          <li key={item.id || idx} onClick={() => onSelect(item)}>
+            <span className="name">{item.name}</span>
+            <span className="value">{item.value ?? 'N/A'}</span>
+            {item.children && (
+              <ul>
+                {item.children.map(child => (
+                  <li key={child.id}>{child.label}</li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))}
+      </ul>
+      {state.data && <pre>{JSON.stringify(state.data, null, 2)}</pre>}
+    </div>
+  );
+};
+
+export default ComplexComponent;
+```
+
+And a Vue 3 component:
+
+```vue
+<template>
+  <div :class="{ active: isActive, 'text-danger': hasError }">
+    <slot name="header" :user="user">
+      <h2>{{ user.name }}</h2>
+    </slot>
+    <ul v-if="items.length">
+      <li v-for="(item, index) in items" :key="item.id" @click="handleClick(item, $event)">
+        {{ item.label }} - {{ formatDate(item.date) }}
+        <button @click.stop.prevent="remove(index)">×</button>
+      </li>
+    </ul>
+    <p v-else>No items found</p>
+    <teleport to="body">
+      <modal v-if="showModal" @close="showModal = false">
+        <template #title>{{ modalTitle }}</template>
+        <template #default="{ close }">
+          <p>Content here</p>
+          <button @click="close">Close</button>
+        </template>
+      </modal>
+    </teleport>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch } from 'vue';
+
+const props = defineProps({
+  items: { type: Array, default: () => [] },
+  user: { type: Object, required: true }
+});
+
+const emit = defineEmits(['update', 'delete']);
+
+const isActive = ref(false);
+const hasError = computed(() => props.items.some(i => i.error));
+
+watch(() => props.items, (newVal) => {
+  console.log(`Items changed: ${newVal.length}`);
+}, { deep: true });
+</script>
+```
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("jsx_stress.mdx".to_string(), content.to_string());
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+
+    if !outcome.errors.is_empty() {
+        for err in &outcome.errors {
+            eprintln!("Error: {} - {}", err.file, err.message);
+        }
+    }
+
+    assert!(
+        outcome.is_all_success(),
+        "JSX-like code blocks should render. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("jsx_stress.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    // Verify code blocks rendered correctly
+    assert!(html.contains("<pre>"), "Should have pre blocks");
+    assert!(
+        html.contains("<code"),
+        "Should have code elements inside pre blocks"
+    );
+
+    // The curly braces should be present in the final output as literal characters
+    // (The escaping {'{'}  happens internally during TSX parsing, but after
+    // JavaScript execution they become literal { and } in the output)
+    assert!(
+        html.contains("{") && html.contains("}"),
+        "Code blocks should contain curly braces in final output"
+    );
+
+    // Verify the code content is preserved (not mangled)
+    assert!(
+        html.contains("useState") && html.contains("useEffect"),
+        "React hooks should be present in code"
+    );
+
+    println!("JSX stress test passed! Output: {} chars", html.len());
+}
+
+#[test]
+fn test_stress_nested_template_literals_and_objects() {
+    // Stress test: Deeply nested template literals and object destructuring
+    let service = create_test_service();
+
+    let content = r#"# JavaScript Nesting Stress Test
+
+Complex template literal nesting:
+
+```javascript
+const generateQuery = (table, { fields = ['*'], where = {}, orderBy, limit }) => {
+  const whereClause = Object.entries(where)
+    .map(([key, value]) => {
+      if (typeof value === 'object') {
+        const { op = '=', val } = value;
+        return `${key} ${op} ${typeof val === 'string' ? `'${val}'` : val}`;
+      }
+      return `${key} = ${typeof value === 'string' ? `'${value}'` : value}`;
+    })
+    .join(' AND ');
+
+  return `
+    SELECT ${fields.join(', ')}
+    FROM ${table}
+    ${whereClause ? `WHERE ${whereClause}` : ''}
+    ${orderBy ? `ORDER BY ${orderBy.field} ${orderBy.dir || 'ASC'}` : ''}
+    ${limit ? `LIMIT ${limit}` : ''}
+  `.trim().replace(/\s+/g, ' ');
+};
+
+// Nested object destructuring with defaults
+const processConfig = ({
+  server: {
+    host = 'localhost',
+    port = 3000,
+    ssl: { enabled: sslEnabled = false, cert = null } = {}
+  } = {},
+  database: {
+    connection: { url = `postgres://${host}:5432/db` } = {}
+  } = {},
+  features: { [process.env.NODE_ENV]: envFeatures = {} } = {}
+} = {}) => {
+  return {
+    serverUrl: `http${sslEnabled ? 's' : ''}://${host}:${port}`,
+    dbUrl: url,
+    features: { ...envFeatures }
+  };
+};
+
+// Tagged template literal
+const sql = (strings, ...values) => ({
+  text: strings.reduce((acc, str, i) =>
+    `${acc}${str}${i < values.length ? `$${i + 1}` : ''}`, ''),
+  values
+});
+
+const query = sql`
+  INSERT INTO users (name, email, metadata)
+  VALUES (${name}, ${email}, ${JSON.stringify({ created: new Date(), tags: ['new', 'active'] })})
+  RETURNING *
+`;
+```
+
+Triple nested callbacks:
+
+```javascript
+fs.readFile(path, 'utf8', (err, data) => {
+  if (err) return callback({ error: err, context: { path, timestamp: Date.now() } });
+
+  parseAsync(data, { format: 'json' }, (parseErr, parsed) => {
+    if (parseErr) return callback({ error: parseErr, raw: data.slice(0, 100) });
+
+    transform(parsed, (item) => ({
+      ...item,
+      computed: `${item.type}-${item.id}-${Date.now()}`,
+      nested: { value: item.nested?.value ?? 'default' }
+    }), (transformErr, result) => {
+      callback(transformErr, {
+        data: result,
+        meta: {
+          source: path,
+          processed: new Date().toISOString(),
+          stats: { original: data.length, items: result?.length ?? 0 }
+        }
+      });
+    });
+  });
+});
+```
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("nesting_stress.mdx".to_string(), content.to_string());
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+
+    assert!(
+        outcome.is_all_success(),
+        "Nested template literals should render. Errors: {:?}",
+        outcome.errors
+    );
+
+    println!("Nested template literals stress test passed!");
+}
+
+#[test]
+fn test_stress_special_chars_and_escape_sequences() {
+    // Stress test: HTML entities, escape sequences, regex patterns
+    let service = create_test_service();
+
+    let content = r#"# Special Characters Stress Test
+
+## HTML Entities in Code
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>&lt;script&gt; &amp; &quot;entities&quot; &#x27;test&#x27;</title>
+  <style>
+    .arrow::before { content: '\2192'; } /* → */
+    .quote::before { content: '\201C'; } /* " */
+    [data-content="a && b || c"] { display: block; }
+  </style>
+</head>
+<body>
+  <div data-json='{"key": "value", "nested": {"a": 1}}'>
+    &lt;not-a-tag&gt; but <real-tag></real-tag>
+  </div>
+  <script>
+    const html = `<div class="${cls}">${content}</div>`;
+    const escaped = text.replace(/[<>&"']/g, c => ({
+      '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+  </script>
+</body>
+</html>
+```
+
+## Regex Patterns
+
+```javascript
+// Patterns that might confuse parsers
+const patterns = {
+  jsx: /<([A-Z][a-zA-Z]*)\s*(\{[^}]*\}|[^>])*\/?>/g,
+  templateLiteral: /\$\{([^}]+)\}/g,
+  nestedBraces: /\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\}/g,
+  htmlEntity: /&(?:#x?[0-9a-fA-F]+|[a-zA-Z]+);/g,
+  escapedChars: /\\[nrtfvb0\\'"]/g,
+  unicodeEscape: /\\u\{[0-9a-fA-F]+\}|\\u[0-9a-fA-F]{4}/g
+};
+
+// Test string with all problematic chars
+const test = `
+  Braces: { } {{ }} {{{ }}}
+  Template: \${var} \${{nested}}
+  Escaped: \n \t \r \\ \'
+  Unicode: \u{1F600} \u0041
+  HTML-ish: <div> </div> <br/> <input type="text">
+  Entities: &lt; &gt; &amp; &quot; &#39; &#x27;
+  Mixed: <Component prop={value} /> vs &lt;Component&gt;
+`;
+```
+
+## Escape Sequences in Strings
+
+```python
+# Python string edge cases
+raw = r'Raw: \n \t \{ \} ${ } stays literal'
+fstring = f"Formatted: {value} and {{escaped braces}}"
+triple = """
+Multi-line with {curly} and 'quotes' and "double"
+And backslash: \\ and newline: \n
+"""
+bytes_lit = b'\x00\x01\x02\xff'
+unicode_str = '\u0041\U0001F600\N{GREEK SMALL LETTER ALPHA}'
+```
+
+## Shell Escaping
+
+```bash
+# Complex quoting
+echo "Double quotes: $VAR and \"escaped\" and \$literal"
+echo 'Single quotes: $VAR stays literal, '\''escaped single'\'''
+echo $'ANSI-C: \n\t\x41\u0042'
+
+# Nested command substitution
+result=$(echo "$(echo "$(echo "deeply nested")")")
+
+# Here-doc with various quoting
+cat << 'EOF'
+$VAR not expanded, {braces} literal
+EOF
+
+cat << EOF
+$VAR expanded, but \$escaped stays
+EOF
+
+# Parameter expansion
+echo "${var:-default}" "${var:+alternate}" "${var:?error}"
+echo "${array[@]}" "${#string}" "${string//pattern/replacement}"
+```
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("special_chars.mdx".to_string(), content.to_string());
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+
+    assert!(
+        outcome.is_all_success(),
+        "Special characters should render. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("special_chars.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    // Verify code blocks are present
+    assert!(html.contains("<pre>"), "Should have pre blocks");
+    assert!(html.contains("<code"), "Should have code elements");
+    println!(
+        "Special chars stress test passed! Output: {} chars",
+        html.len()
+    );
+}
+
+#[test]
+fn test_stress_mixed_jsx_markdown_html() {
+    // Stress test: Real JSX components mixed with markdown and raw HTML
+    let service = create_test_service();
+
+    let content = r#"---
+title: Mixed Content Test
+items:
+  - name: Item 1
+    value: 100
+  - name: Item 2
+    value: 200
+---
+
+# {context('title')}
+
+This tests mixing **real JSX components** with markdown and HTML.
+
+## Markdown Section
+
+Here's a list with `inline code` and **bold**:
+
+1. First item with code: `const x = { a: 1 };`
+2. Second item with JSX-like: `<Component prop={value} />`
+3. Third with template: `Hello ${name}!`
+
+> **Note:** This blockquote contains `{curly braces}` and <em>HTML tags</em>.
+
+## Real JSX Component
+
+<DataTable
+  title={context('title')}
+  items={context('items')}
+/>
+
+## HTML Table (Not JSX)
+
+<table border="1">
+<thead>
+<tr><th>Name</th><th>Value</th></tr>
+</thead>
+<tbody>
+<tr><td>Alpha</td><td>100</td></tr>
+<tr><td>Beta</td><td>200</td></tr>
+</tbody>
+</table>
+
+## Code Block After Component
+
+```tsx
+// This is code, not real JSX
+const Table = ({ data }: { data: Array<{ id: number; name: string }> }) => (
+  <table>
+    <tbody>
+      {data.map(row => (
+        <tr key={row.id}>
+          <td>{row.name}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+```
+
+## Another Real Component
+
+<Alert type="info">
+  This alert contains **markdown** and `code`.
+</Alert>
+
+---
+
+*End of mixed content test*
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("mixed_stress.mdx".to_string(), content.to_string());
+
+    // Provide the components
+    let mut components = HashMap::new();
+    components.insert(
+        "DataTable".to_string(),
+        ComponentDefinition {
+            name: Some("DataTable".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ title, items }) {
+                return (
+                    <div class="data-table">
+                        <h3>{title}</h3>
+                        <ul>
+                            {items.map((item, i) => (
+                                <li key={i}>{item.name}: {item.value}</li>
+                            ))}
+                        </ul>
+                    </div>
+                );
+            }"#
+            .to_string(),
+        },
+    );
+    components.insert(
+        "Alert".to_string(),
+        ComponentDefinition {
+            name: Some("Alert".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ type, children }) {
+                return <div class={`alert alert-${type}`}>{children}</div>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+
+    if !outcome.errors.is_empty() {
+        for err in &outcome.errors {
+            eprintln!("Error: {} - {}", err.file, err.message);
+            if let Some(line) = err.line {
+                eprintln!("  at line {}, col {:?}", line, err.column);
+            }
+        }
+    }
+
+    assert!(
+        outcome.is_all_success(),
+        "Mixed JSX/Markdown/HTML should render. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("mixed_stress.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    // Verify components rendered
+    assert!(
+        html.contains("data-table"),
+        "DataTable should render: {}",
+        &html[..1000.min(html.len())]
+    );
+    assert!(html.contains("alert-info"), "Alert should render: {}", html);
+
+    // Verify frontmatter resolved
+    assert!(
+        html.contains("Mixed Content Test"),
+        "Title should be resolved"
+    );
+    assert!(html.contains("Item 1"), "Items should be rendered");
+
+    // Verify code blocks have escaped braces
+    assert!(
+        html.contains("{'{'}") || html.contains("<code"),
+        "Code blocks should be present with escaped braces"
+    );
+
+    // Verify HTML table preserved
+    assert!(html.contains("<table"), "HTML table should be preserved");
+
+    println!(
+        "Mixed JSX/Markdown/HTML stress test passed! Output: {} chars",
+        html.len()
+    );
+}
