@@ -437,7 +437,58 @@ fn render_markdown(content: &str) -> Result<String, MdxError> {
         .map_err(|e| MdxError::MarkdownRender(e.to_string()))?;
 
     // Restore JSX components after markdown processing
-    Ok(restore_jsx_components(&html, &placeholders))
+    let restored = restore_jsx_components(&html, &placeholders);
+
+    // Escape curly braces inside code blocks to prevent JSX interpretation
+    Ok(escape_code_block_braces(&restored))
+}
+
+/// Escapes curly braces inside `<code>` and `<pre>` blocks to prevent JSX interpretation.
+///
+/// Code blocks from markdown contain literal code which may include `{` and `}` characters.
+/// These must be escaped as `{'{'}` and `{'}'}` in JSX to be treated as literal text.
+///
+/// # Example
+/// Input:  `<code>console.log(${name});</code>`
+/// Output: `<code>console.log(${'{'}'name'{'}');</code>`
+fn escape_code_block_braces(html: &str) -> String {
+    // Match content inside <code>...</code> and <pre>...</pre> tags
+    // We process these separately to avoid escaping braces in JSX attributes
+
+    // Pattern to match code/pre blocks: <code>content</code> or <pre>content</pre>
+    // Also handles: <code class="...">content</code>
+    static CODE_BLOCK_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?s)(<(?:code|pre)[^>]*>)(.*?)(</(?:code|pre)>)")
+            .expect("hardcoded regex pattern is valid")
+    });
+
+    CODE_BLOCK_PATTERN
+        .replace_all(html, |caps: &regex::Captures| {
+            let opening_tag = &caps[1];
+            let content = &caps[2];
+            let closing_tag = &caps[3];
+
+            // Use single-pass escaping to avoid double-escape issues
+            let escaped_content = escape_braces_in_content(content);
+
+            format!("{}{}{}", opening_tag, escaped_content, closing_tag)
+        })
+        .into_owned()
+}
+
+/// Escapes curly braces in a single pass to avoid double-escaping.
+///
+/// Converts `{` to `{'{'}` and `}` to `{'}'}` for JSX literal rendering.
+fn escape_braces_in_content(content: &str) -> String {
+    let mut result = String::with_capacity(content.len() * 2);
+    for ch in content.chars() {
+        match ch {
+            '{' => result.push_str("{'{'}"),
+            '}' => result.push_str("{'}'}"),
+            _ => result.push(ch),
+        }
+    }
+    result
 }
 
 /// Helper function to log render errors with context
@@ -1350,6 +1401,38 @@ const greet = () => console.log("Hi");
         assert!(
             result.contains("&lt;div") || result.contains("<div"),
             "Should handle HTML in code blocks"
+        );
+    }
+
+    #[test]
+    fn test_code_fenced_with_curly_braces() {
+        // JavaScript code with template literals and curly braces
+        let content = r#"```javascript
+const greeting = (name) => {
+    console.log(`Hello, ${name}!`);
+    return { success: true };
+};
+```"#;
+        let result = render_markdown(content).unwrap();
+        assert!(result.contains("<pre>"));
+        // Curly braces should be escaped for JSX
+        assert!(
+            result.contains("{'{'}") && result.contains("{'}'}"),
+            "Curly braces should be escaped in code blocks, got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_code_inline_with_curly_braces() {
+        // Inline code with curly braces
+        let content = "Use `{foo: 'bar'}` for objects.";
+        let result = render_markdown(content).unwrap();
+        // Curly braces in inline code should be escaped
+        assert!(
+            result.contains("{'{'}") && result.contains("{'}'}"),
+            "Curly braces should be escaped in inline code, got: {}",
+            result
         );
     }
 
