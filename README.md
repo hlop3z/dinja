@@ -33,6 +33,14 @@ docker pull ghcr.io/hlop3z/dinja:latest
 docker run -p 8080:8080 ghcr.io/hlop3z/dinja:latest
 ```
 
+**Test with curl:**
+
+```bash
+curl -X POST http://localhost:8080/render \
+  -H "Content-Type: application/json" \
+  -d '{"settings":{"output":"html"},"mdx":{"page.mdx":"# Hello **World**"}}'
+```
+
 ### 2. Install a Client
 
 | Target     | Command                   |
