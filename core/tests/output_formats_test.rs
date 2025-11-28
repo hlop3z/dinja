@@ -1884,3 +1884,623 @@ const Table = ({ data }: { data: Array<{ id: number; name: string }> }) => (
         html.len()
     );
 }
+
+// =============================================================================
+// TSX/MDX Edge Case Tests
+// =============================================================================
+
+#[test]
+fn test_jsx_explicit_props_from_context() {
+    // Test explicitly passing props from context (spread syntax {...context()} is not supported)
+    let service = create_test_service();
+
+    let content = r#"---
+title: Props Test
+className: container
+id: main-box
+---
+
+<Box title={context('title')} className={context('className')} id={context('id')} />
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("props.mdx".to_string(), content.to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "Box".to_string(),
+        ComponentDefinition {
+            name: Some("Box".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component(props) {
+                return <div id={props.id} class={props.className}>{props.title}</div>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Explicit props should work. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("props.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    assert!(html.contains("Props Test"), "Title should render: {}", html);
+    assert!(
+        html.contains("container"),
+        "className should render: {}",
+        html
+    );
+    assert!(html.contains("main-box"), "id should render: {}", html);
+    println!("Explicit props output: {}", html);
+}
+
+#[test]
+fn test_inline_mdx_expressions() {
+    // Test inline expressions in markdown text
+    let service = create_test_service();
+
+    let content = r#"---
+name: World
+count: 42
+---
+
+# Hello {context('name')}!
+
+The answer is {context('count')}.
+
+Math works: {10 + 5} equals fifteen.
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("inline.mdx".to_string(), content.to_string());
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Inline expressions should work. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("inline.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    assert!(
+        html.contains("Hello World"),
+        "Name should be interpolated: {}",
+        html
+    );
+    assert!(
+        html.contains("42"),
+        "Count should be interpolated: {}",
+        html
+    );
+    assert!(html.contains("15"), "Math should evaluate: {}", html);
+}
+
+#[test]
+fn test_nested_jsx_components() {
+    // Test nested component rendering
+    let service = create_test_service();
+
+    let content = r#"<Card>
+  <CardHeader title="Nested" />
+  <CardBody>
+    Content here
+  </CardBody>
+</Card>"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("nested.mdx".to_string(), content.to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "Card".to_string(),
+        ComponentDefinition {
+            name: Some("Card".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ children }) {
+                return <div class="card">{children}</div>;
+            }"#
+            .to_string(),
+        },
+    );
+    components.insert(
+        "CardHeader".to_string(),
+        ComponentDefinition {
+            name: Some("CardHeader".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ title }) {
+                return <div class="card-header">{title}</div>;
+            }"#
+            .to_string(),
+        },
+    );
+    components.insert(
+        "CardBody".to_string(),
+        ComponentDefinition {
+            name: Some("CardBody".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ children }) {
+                return <div class="card-body">{children}</div>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Nested components should work. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("nested.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    assert!(
+        html.contains("card"),
+        "Card class should be present: {}",
+        html
+    );
+    assert!(
+        html.contains("card-header"),
+        "CardHeader should render: {}",
+        html
+    );
+    assert!(
+        html.contains("card-body"),
+        "CardBody should render: {}",
+        html
+    );
+    assert!(
+        html.contains("Nested"),
+        "Title prop should render: {}",
+        html
+    );
+}
+
+#[test]
+fn test_component_children_with_markdown() {
+    // Test component children containing markdown syntax
+    let service = create_test_service();
+
+    let content = r#"<Callout type="warning">
+
+**Important:** This is *emphasized* text with `code`.
+
+- Item 1
+- Item 2
+
+</Callout>"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("children_md.mdx".to_string(), content.to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "Callout".to_string(),
+        ComponentDefinition {
+            name: Some("Callout".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ type, children }) {
+                return <div class={`callout callout-${type}`}>{children}</div>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Children with markdown should work. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("children_md.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    assert!(
+        html.contains("callout-warning"),
+        "Callout type should render: {}",
+        html
+    );
+    // Note: markdown inside JSX children may or may not be processed depending on implementation
+    println!("Children with markdown output: {}", html);
+}
+
+#[test]
+fn test_array_object_props() {
+    // Test passing array and object literals as props
+    let service = create_test_service();
+
+    let content =
+        r#"<List items={["apple", "banana", "cherry"]} config={{ sorted: true, limit: 10 }} />"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("array_props.mdx".to_string(), content.to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "List".to_string(),
+        ComponentDefinition {
+            name: Some("List".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ items, config }) {
+                const sorted = config.sorted ? items.slice().sort() : items;
+                const limited = sorted.slice(0, config.limit);
+                return <ul>{limited.map((item, i) => <li key={i}>{item}</li>)}</ul>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Array/object props should work. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("array_props.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    assert!(html.contains("<ul>"), "List should render: {}", html);
+    assert!(html.contains("apple"), "Items should render: {}", html);
+    assert!(html.contains("banana"), "Items should render: {}", html);
+    // Sorted order: apple, banana, cherry
+    println!("Array props output: {}", html);
+}
+
+#[test]
+fn test_conditional_jsx_in_component() {
+    // Test conditional rendering via component props (standalone conditional JSX at top-level has parsing limitations)
+    let service = create_test_service();
+
+    let content = r#"---
+showHeader: true
+showFooter: false
+isDarkMode: true
+---
+
+<ConditionalLayout
+    showHeader={context('showHeader')}
+    showFooter={context('showFooter')}
+    isDarkMode={context('isDarkMode')}
+/>
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("conditional.mdx".to_string(), content.to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "ConditionalLayout".to_string(),
+        ComponentDefinition {
+            name: Some("ConditionalLayout".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ showHeader, showFooter, isDarkMode }) {
+                return (
+                    <div class="layout">
+                        {showHeader && <header class="header">Header Content</header>}
+                        <main class={isDarkMode ? "theme-dark" : "theme-light"}>
+                            Main content
+                        </main>
+                        {showFooter && <footer class="footer">Footer Content</footer>}
+                    </div>
+                );
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Conditional rendering should work. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("conditional.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    // Header should appear (showHeader: true)
+    assert!(
+        html.contains("header") && html.contains("Header Content"),
+        "Header should render when showHeader is true: {}",
+        html
+    );
+
+    // DarkTheme should appear (isDarkMode: true)
+    assert!(
+        html.contains("theme-dark"),
+        "Dark theme class should render when isDarkMode is true: {}",
+        html
+    );
+
+    // Footer should NOT appear (showFooter: false)
+    assert!(
+        !html.contains("Footer Content"),
+        "Footer should not render when showFooter is false: {}",
+        html
+    );
+
+    println!("Conditional rendering output: {}", html);
+}
+
+#[test]
+fn test_self_closing_html_tags() {
+    // Test self-closing HTML tags like <br>, <hr>, <img>
+    let service = create_test_service();
+
+    let content = r#"# Self-closing Tags
+
+Line one<br/>Line two
+
+---
+
+<img src="https://example.com/image.png" alt="Test image" />
+
+<input type="text" placeholder="Enter text" disabled />
+
+<hr />
+
+End of test.
+"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("selfclose.mdx".to_string(), content.to_string());
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Self-closing tags should work. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("selfclose.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    assert!(
+        html.contains("<br") || html.contains("<br/>") || html.contains("<br />"),
+        "br tag should render: {}",
+        html
+    );
+    assert!(
+        html.contains("<img") || html.contains("example.com/image.png"),
+        "img tag should render: {}",
+        html
+    );
+    assert!(
+        html.contains("<hr") || html.contains("<hr/>") || html.contains("<hr />"),
+        "hr tag should render: {}",
+        html
+    );
+
+    println!("Self-closing tags output: {}", html);
+}
+
+#[test]
+fn test_jsx_boolean_and_numeric_props() {
+    // Test boolean and numeric prop handling
+    let service = create_test_service();
+
+    let content =
+        r#"<Counter start={0} end={100} step={5} autoPlay={true} reverse={false} label="Count" />"#;
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("bool_num.mdx".to_string(), content.to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "Counter".to_string(),
+        ComponentDefinition {
+            name: Some("Counter".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component({ start, end, step, autoPlay, reverse, label }) {
+                return (
+                    <div class="counter">
+                        <span class="label">{label}</span>
+                        <span class="range">{start} to {end} by {step}</span>
+                        <span class="auto">{autoPlay ? 'auto' : 'manual'}</span>
+                        <span class="dir">{reverse ? 'reverse' : 'forward'}</span>
+                    </div>
+                );
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Boolean/numeric props should work. Errors: {:?}",
+        outcome.errors
+    );
+
+    let html = outcome
+        .files
+        .get("bool_num.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    assert!(html.contains("Count"), "Label should render: {}", html);
+    assert!(
+        html.contains("0") && html.contains("100"),
+        "Numeric props should render: {}",
+        html
+    );
+    assert!(
+        html.contains("auto"),
+        "Boolean true should render: {}",
+        html
+    );
+    assert!(
+        html.contains("forward"),
+        "Boolean false should render: {}",
+        html
+    );
+
+    println!("Boolean/numeric props output: {}", html);
+}
