@@ -57,4 +57,8 @@ pub enum MdxError {
     /// Engine code size exceeds maximum allowed limit
     #[error("Engine code size exceeds maximum allowed: {0} bytes")]
     EngineCodeTooLarge(usize),
+
+    /// Invalid export default statement - must be `export default function Component`
+    #[error("Invalid export: '{0}' violates the naming convention. Use 'export default function Component() {{ ... }}' instead")]
+    InvalidExportDefault(String),
 }

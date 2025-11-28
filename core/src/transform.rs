@@ -229,19 +229,41 @@ fn cleanup_generated_code(code: &str) -> String {
     let mut cleaned = code.to_string();
     // Replace pure annotations with a space
     cleaned = cleaned.replace("/* @__PURE__ */ ", " ");
-    // Remove ES module constructs (import/export) that aren't valid in script context
+
+    // Convert `export default function` to just `function` (preserves function declaration)
+    // This handles cases like `export default function Component() { ... }`
+    cleaned = cleaned.replace("export default function ", "function ");
+
+    // Convert `export default class` to just `class` (preserves class declaration)
+    cleaned = cleaned.replace("export default class ", "class ");
+
+    // Remove remaining ES module constructs (import/export) that aren't valid in script context
     let lines: Vec<&str> = cleaned
         .lines()
         .filter(|line| {
             let trimmed = line.trim();
-            // Filter out import and export statements
-            !trimmed.starts_with("import ")
-                && !trimmed.starts_with("export default ")
-                && !trimmed.starts_with("export ")
+            // Filter out import statements and export-only statements
+            // Note: `export default function/class` already converted above
+            !is_import_or_pure_export(trimmed)
         })
         .collect();
     cleaned = lines.join("\n");
     cleaned
+}
+
+/// Checks if a line is an import statement or a pure export (not function/class declaration)
+fn is_import_or_pure_export(trimmed: &str) -> bool {
+    if trimmed.starts_with("import ") {
+        return true;
+    }
+    if trimmed.starts_with("export default ") || trimmed.starts_with("export {") {
+        return true;
+    }
+    // Export of function or class declaration should be kept
+    if trimmed.starts_with("export ") {
+        return !trimmed.contains("function ") && !trimmed.contains("class ");
+    }
+    false
 }
 
 /// Internal transformation function that performs the complete TSX-to-JavaScript pipeline.
@@ -365,24 +387,115 @@ pub fn transform_component_function(component_code: &str) -> Result<String, MdxE
     transform_tsx_internal(component_code, &TsxTransformConfig::default(), false)
 }
 
+/// Validates that an export default statement uses the required pattern
+///
+/// The only valid pattern is:
+/// - `export default function Component() { ... }` (sync function named Component)
+///
+/// Invalid exports (will return error):
+/// - `export default function Button() { ... }` (wrong name - must be Component)
+/// - `export default () => { ... }` (arrow functions not supported)
+/// - `export default async function Component() { ... }` (async not supported)
+/// - `export default class Component { ... }` (classes not supported)
+/// - `export default SomeVariable` (identifier reference)
+///
+/// Note: Arrow functions, async functions, and classes are rejected because
+/// the renderer requires a synchronous function named `Component` that can
+/// be called directly.
+fn validate_export_default(rest: &str) -> Result<(), MdxError> {
+    let trimmed = rest.trim();
+
+    // Arrow functions are NOT supported - they don't define a named Component
+    if trimmed.starts_with('(') {
+        return Err(MdxError::InvalidExportDefault("arrow function".to_string()));
+    }
+
+    // Async arrow functions are NOT supported
+    if trimmed.starts_with("async (") {
+        return Err(MdxError::InvalidExportDefault(
+            "async arrow function".to_string(),
+        ));
+    }
+
+    // Async functions are NOT supported - they return Promises
+    if trimmed.starts_with("async function") {
+        return Err(MdxError::InvalidExportDefault("async function".to_string()));
+    }
+
+    // Classes are NOT supported - they require `new` to instantiate
+    if trimmed.starts_with("class ") {
+        let class_name = trimmed
+            .strip_prefix("class ")
+            .unwrap_or("")
+            .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '$')
+            .next()
+            .unwrap_or("unknown");
+        return Err(MdxError::InvalidExportDefault(format!(
+            "class {class_name}"
+        )));
+    }
+
+    // Check for named function: must be "function Component"
+    if let Some(after_fn) = trimmed.strip_prefix("function ") {
+        let fn_name = after_fn
+            .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '$')
+            .next()
+            .unwrap_or("");
+
+        if fn_name == "Component" {
+            return Ok(());
+        }
+        return Err(MdxError::InvalidExportDefault(format!(
+            "function {fn_name}"
+        )));
+    }
+
+    // If we get here, it's likely an identifier export like `export default MyComponent`
+    // Extract the identifier name for the error message
+    let identifier = trimmed
+        .split(|c: char| !c.is_alphanumeric() && c != '_' && c != '$')
+        .next()
+        .unwrap_or("unknown");
+
+    // Check if it looks like an identifier (starts with letter or underscore)
+    if !identifier.is_empty()
+        && identifier
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_alphabetic() || c == '_' || c == '$')
+    {
+        return Err(MdxError::InvalidExportDefault(identifier.to_string()));
+    }
+
+    // For other invalid patterns, use a generic message
+    Err(MdxError::InvalidExportDefault("expression".to_string()))
+}
+
 /// Strips export statements from component code
 ///
 /// Removes `export default` and `export` from the beginning of component code
-/// to make it compatible with the TSX parser
-fn strip_export_statements(code: &str) -> String {
+/// to make it compatible with the TSX parser.
+///
+/// # Errors
+///
+/// Returns `MdxError::InvalidExportDefault` if `export default` is followed by
+/// an identifier reference instead of a component definition.
+fn strip_export_statements(code: &str) -> Result<String, MdxError> {
     let trimmed = code.trim();
 
     // Handle "export default function" or "export default ..."
     if let Some(rest) = trimmed.strip_prefix("export default ") {
-        return rest.to_string();
+        // Validate that this is a proper component export
+        validate_export_default(rest)?;
+        return Ok(rest.to_string());
     }
 
     // Handle "export function" or "export const/let/var"
     if let Some(rest) = trimmed.strip_prefix("export ") {
-        return rest.to_string();
+        return Ok(rest.to_string());
     }
 
-    code.to_string()
+    Ok(code.to_string())
 }
 
 /// Intelligently transforms component code (detects if it's raw JSX or a function)
@@ -392,17 +505,26 @@ fn strip_export_statements(code: &str) -> String {
 ///
 /// # Returns
 /// Generated JavaScript code or an error
+///
+/// # Errors
+///
+/// Returns `MdxError::InvalidExportDefault` if the code contains an invalid
+/// `export default` statement (e.g., `export default SomeVariable` instead of
+/// a proper component definition).
 pub fn transform_component_code(code: &str) -> Result<String, MdxError> {
-    // First, strip any export statements
-    let code_without_exports = strip_export_statements(code);
+    // First, strip any export statements (validates export default)
+    let code_without_exports = strip_export_statements(code)?;
     let trimmed = code_without_exports.trim();
 
     // Check if it's already a function definition
     let is_function = trimmed.starts_with("function")
+        || trimmed.starts_with("async function")
+        || trimmed.starts_with("async (")
         || (trimmed.starts_with('(') && trimmed.contains("=>"))
         || trimmed.starts_with("const ")
         || trimmed.starts_with("let ")
-        || trimmed.starts_with("var ");
+        || trimmed.starts_with("var ")
+        || trimmed.starts_with("class ");
 
     if is_function {
         // It's a function, transform without wrapping
@@ -410,5 +532,361 @@ pub fn transform_component_code(code: &str) -> Result<String, MdxError> {
     } else {
         // It's raw JSX, use the normal transformer that wraps it
         transform_tsx_to_js(&code_without_exports)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ==================== Valid export default test ====================
+    // Only `export default function Component` is valid
+
+    #[test]
+    fn test_valid_export_default_function_component() {
+        let code = "export default function Component() { return <button>Click</button>; }";
+        let result = transform_component_code(code);
+        assert!(
+            result.is_ok(),
+            "function Component should be valid, got: {:?}",
+            result.err()
+        );
+        let output = result.unwrap();
+        assert!(
+            output.contains("function Component()"),
+            "Output should contain function Component, got: {output}"
+        );
+        assert!(
+            output.contains("engine.h("),
+            "Output should have transformed JSX to engine.h calls, got: {output}"
+        );
+    }
+
+    #[test]
+    fn test_valid_export_default_function_component_with_props() {
+        let code = "export default function Component(props) { return <div>{props.name}</div>; }";
+        let result = transform_component_code(code);
+        assert!(
+            result.is_ok(),
+            "function Component with props should be valid, got: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_valid_export_default_function_component_typescript() {
+        // Test TypeScript syntax with type annotations
+        let code =
+            "export default function Component(props: any) { return <div>{props.name}</div>; }";
+        let result = transform_component_code(code);
+        assert!(
+            result.is_ok(),
+            "function Component with TypeScript props: any should be valid, got: {:?}",
+            result.err()
+        );
+        let output = result.unwrap();
+        assert!(
+            output.contains("function Component(props)"),
+            "TypeScript types should be stripped, got: {output}"
+        );
+    }
+
+    #[test]
+    fn test_valid_export_default_function_component_typescript_interface() {
+        // Test TypeScript with interface-like type
+        let code = "export default function Component(props: { name: string; age: number }) { return <div>{props.name}</div>; }";
+        let result = transform_component_code(code);
+        assert!(
+            result.is_ok(),
+            "function Component with TypeScript inline type should be valid, got: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_decorator_before_export_default_fails() {
+        // Decorators on function declarations are not valid JS/TS syntax
+        // They only work on classes (which we already reject)
+        let code = r#"@logged
+export default function Component() { return <div>Decorated</div>; }"#;
+        let result = transform_component_code(code);
+        // Should fail - either at validation (doesn't start with export default)
+        // or at parse time (invalid syntax)
+        assert!(
+            result.is_err(),
+            "Decorator on function should fail: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_decorator_inside_component_on_class() {
+        // Decorators work INSIDE the component on helper classes
+        let code = r#"export default function Component(props: any) {
+    function logged(target: any) { return target; }
+
+    @logged
+    class Helper {
+        getValue() { return "helper"; }
+    }
+
+    const h = new Helper();
+    return <div>{h.getValue()}</div>;
+}"#;
+        let result = transform_component_code(code);
+        assert!(
+            result.is_ok(),
+            "Decorator on class inside component should work: {:?}",
+            result.err()
+        );
+        let output = result.unwrap();
+        assert!(
+            output.contains("_decorate"),
+            "Should transform decorator: {output}"
+        );
+    }
+
+    #[test]
+    fn test_decorator_on_class_method() {
+        // Method decorators also work
+        let code = r#"export default function Component(props: any) {
+    function log(target: any, key: string) { return target; }
+
+    class Utils {
+        @log
+        format(value: string) { return value.toUpperCase(); }
+    }
+
+    const u = new Utils();
+    return <div>{u.format(props.text)}</div>;
+}"#;
+        let result = transform_component_code(code);
+        assert!(
+            result.is_ok(),
+            "Method decorator should work: {:?}",
+            result.err()
+        );
+    }
+
+    #[test]
+    fn test_decorator_outside_component_at_module_level() {
+        // Decorators on classes defined at module level (outside Component)
+        let code = r#"function logged(target: any) { console.log('decorated'); return target; }
+
+@logged
+class Utils {
+    format(value: string) { return value.toUpperCase(); }
+}
+
+export default function Component(props: any) {
+    const u = new Utils();
+    return <div>{u.format(props.text)}</div>;
+}"#;
+        let result = transform_component_code(code);
+        assert!(
+            result.is_ok(),
+            "Module-level decorator should work: {:?}",
+            result.err()
+        );
+        let output = result.unwrap();
+        assert!(
+            output.contains("_decorate"),
+            "Should transform decorator: {output}"
+        );
+    }
+
+    #[test]
+    fn test_decorator_on_standalone_function_fails() {
+        // Decorators on standalone functions are NOT valid in TypeScript/JavaScript
+        // This is a language limitation - decorators only work on classes and class members
+        let code = r#"function log(fn: any) { return fn; }
+
+@log
+function myUtil() { return "hello"; }
+
+export default function Component() {
+    return <div>{myUtil()}</div>;
+}"#;
+        let result = transform_component_code(code);
+        // Should fail at parse time - decorators on functions are invalid syntax
+        assert!(
+            result.is_err(),
+            "Decorator on standalone function should fail (invalid syntax)"
+        );
+    }
+
+    // ==================== Invalid: wrong function name ====================
+
+    #[test]
+    fn test_invalid_export_default_function_wrong_name() {
+        let code = "export default function Button() { return <button>Click</button>; }";
+        let result = transform_component_code(code);
+
+        assert!(
+            result.is_err(),
+            "function Button should be invalid (must be Component)"
+        );
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, MdxError::InvalidExportDefault(ref name) if name == "function Button"),
+            "Error should mention 'function Button', got: {err:?}"
+        );
+    }
+
+    // ==================== Invalid: arrow functions not supported ====================
+
+    #[test]
+    fn test_invalid_export_default_arrow_function() {
+        let code = "export default () => <div>Hello</div>";
+        let result = transform_component_code(code);
+
+        assert!(result.is_err(), "Arrow function should be invalid");
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, MdxError::InvalidExportDefault(ref name) if name == "arrow function"),
+            "Error should mention 'arrow function', got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_invalid_export_default_arrow_with_props() {
+        let code = "export default (props) => <div>{props.name}</div>";
+        let result = transform_component_code(code);
+
+        assert!(
+            result.is_err(),
+            "Arrow function with props should be invalid"
+        );
+    }
+
+    #[test]
+    fn test_invalid_export_default_async_arrow() {
+        let code = "export default async () => <div>Async</div>";
+        let result = transform_component_code(code);
+
+        assert!(result.is_err(), "Async arrow function should be invalid");
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, MdxError::InvalidExportDefault(ref name) if name == "async arrow function"),
+            "Error should mention 'async arrow function', got: {err:?}"
+        );
+    }
+
+    // ==================== Invalid: async functions not supported ====================
+
+    #[test]
+    fn test_invalid_export_default_async_function() {
+        let code = "export default async function Component() { return <div>Data</div>; }";
+        let result = transform_component_code(code);
+
+        assert!(result.is_err(), "Async function should be invalid");
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, MdxError::InvalidExportDefault(ref name) if name == "async function"),
+            "Error should mention 'async function', got: {err:?}"
+        );
+    }
+
+    // ==================== Invalid: classes not supported ====================
+
+    #[test]
+    fn test_invalid_export_default_class() {
+        let code = "export default class Component { render() { return <button />; } }";
+        let result = transform_component_code(code);
+
+        assert!(result.is_err(), "Class should be invalid");
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, MdxError::InvalidExportDefault(ref name) if name == "class Component"),
+            "Error should mention 'class Component', got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_invalid_export_default_class_wrong_name() {
+        let code = "export default class MyWidget { render() { return <div />; } }";
+        let result = transform_component_code(code);
+
+        assert!(result.is_err(), "Class MyWidget should be invalid");
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, MdxError::InvalidExportDefault(ref name) if name == "class MyWidget"),
+            "Error should mention 'class MyWidget', got: {err:?}"
+        );
+    }
+
+    // ==================== Invalid: identifier reference ====================
+
+    #[test]
+    fn test_invalid_export_default_identifier() {
+        let code = "export default MyComponent";
+        let result = transform_component_code(code);
+
+        assert!(result.is_err(), "Identifier export should be invalid");
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, MdxError::InvalidExportDefault(ref name) if name == "MyComponent"),
+            "Error should contain 'MyComponent', got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_invalid_export_default_identifier_with_semicolon() {
+        let code = "export default Button;";
+        let result = transform_component_code(code);
+
+        assert!(
+            result.is_err(),
+            "Identifier export with semicolon should be invalid"
+        );
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, MdxError::InvalidExportDefault(ref name) if name == "Button"),
+            "Error should contain 'Button', got: {err:?}"
+        );
+    }
+
+    // ==================== Error message format ====================
+
+    #[test]
+    fn test_error_message_suggests_component() {
+        let code = "export default function Widget() { return <div />; }";
+        let result = transform_component_code(code);
+
+        let err = result.unwrap_err();
+        let error_message = format!("{err}");
+        assert!(
+            error_message.contains("function Widget"),
+            "Error message should contain the invalid name"
+        );
+        assert!(
+            error_message.contains("export default function Component()"),
+            "Error message should suggest using 'Component'"
+        );
+    }
+
+    // ==================== Non-export default tests (should still work) ====================
+
+    #[test]
+    fn test_no_export_raw_jsx() {
+        let code = "<div>Hello World</div>";
+        let result = transform_component_code(code);
+        assert!(result.is_ok(), "Raw JSX without export should work");
+    }
+
+    #[test]
+    fn test_export_const_function() {
+        // Named exports (not default) don't have this restriction
+        let code = "export const Button = () => <button>Click</button>";
+        let result = transform_component_code(code);
+        assert!(result.is_ok(), "export const should be valid");
+    }
+
+    #[test]
+    fn test_export_function() {
+        // Named exports (not default) don't have this restriction
+        let code = "export function Button() { return <button>Click</button>; }";
+        let result = transform_component_code(code);
+        assert!(result.is_ok(), "export function should be valid");
     }
 }

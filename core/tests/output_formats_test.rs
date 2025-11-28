@@ -525,6 +525,487 @@ fn test_output_format_consistency() {
 
 use dinja_core::models::ComponentDefinition;
 
+// ==================== Export Default Component Tests ====================
+// Only `export default function Component` is supported
+
+#[test]
+fn test_export_default_function_component_renders() {
+    let service = create_test_service();
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("test.mdx".to_string(), "<MyButton />".to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "MyButton".to_string(),
+        ComponentDefinition {
+            name: Some("MyButton".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component() {
+                return <button class="btn">Click Me</button>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(outcome.is_all_success(), "Render should succeed");
+
+    let html = outcome
+        .files
+        .get("test.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    println!("function Component output:\n{}", html);
+    assert!(
+        html.contains(r#"<button class="btn">Click Me</button>"#),
+        "Should render button element: {}",
+        html
+    );
+}
+
+#[test]
+fn test_export_default_function_component_with_props_renders() {
+    let service = create_test_service();
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert(
+        "test.mdx".to_string(),
+        r#"<Greeting name="World" />"#.to_string(),
+    );
+
+    let mut components = HashMap::new();
+    components.insert(
+        "Greeting".to_string(),
+        ComponentDefinition {
+            name: Some("Greeting".to_string()),
+            docs: None,
+            args: None,
+            code: r#"export default function Component(props) {
+                return <span class="greeting">Hello, {props.name}!</span>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(outcome.is_all_success(), "Render should succeed");
+
+    let html = outcome
+        .files
+        .get("test.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    println!("function Component with props output:\n{}", html);
+    assert!(
+        html.contains(r#"<span class="greeting">Hello, World!</span>"#),
+        "Should render greeting with props: {}",
+        html
+    );
+}
+
+#[test]
+fn test_invalid_export_default_function_name_fails() {
+    let service = create_test_service();
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("test.mdx".to_string(), "<BadButton />".to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "BadButton".to_string(),
+        ComponentDefinition {
+            name: Some("BadButton".to_string()),
+            docs: None,
+            args: None,
+            // Using "Button" instead of "Component" should fail
+            code: r#"export default function Button() {
+                return <button>Bad</button>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+
+    // Should fail because function name is not "Component"
+    assert!(
+        !outcome.is_all_success(),
+        "Render should fail for wrong function name"
+    );
+
+    let file_outcome = outcome.files.get("test.mdx").unwrap();
+    assert!(
+        matches!(file_outcome.status, FileRenderStatus::Failed),
+        "Should have failed status"
+    );
+
+    let error = file_outcome.error.as_ref().expect("Should have error");
+    println!("Expected error: {}", error);
+    assert!(
+        error.contains("function Button") || error.contains("naming convention"),
+        "Error should mention the wrong function name: {}",
+        error
+    );
+}
+
+#[test]
+fn test_export_default_function_component_typescript_renders() {
+    let service = create_test_service();
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert(
+        "test.mdx".to_string(),
+        r#"<TypedGreeting name="TypeScript" count={42} />"#.to_string(),
+    );
+
+    let mut components = HashMap::new();
+    components.insert(
+        "TypedGreeting".to_string(),
+        ComponentDefinition {
+            name: Some("TypedGreeting".to_string()),
+            docs: None,
+            args: None,
+            // TypeScript syntax with type annotations
+            code: r#"export default function Component(props: { name: string; count: number }) {
+                return <div class="typed">Hello {props.name}, count: {props.count}</div>;
+            }"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "TypeScript component should render successfully"
+    );
+
+    let html = outcome
+        .files
+        .get("test.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    println!("TypeScript component output:\n{}", html);
+    assert!(
+        html.contains("Hello TypeScript"),
+        "Should render name prop: {}",
+        html
+    );
+    assert!(
+        html.contains("count: 42"),
+        "Should render count prop: {}",
+        html
+    );
+}
+
+#[test]
+fn test_decorator_outside_component_renders() {
+    let service = create_test_service();
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert(
+        "test.mdx".to_string(),
+        r#"<DecoratedUtils text="hello" />"#.to_string(),
+    );
+
+    let mut components = HashMap::new();
+    components.insert(
+        "DecoratedUtils".to_string(),
+        ComponentDefinition {
+            name: Some("DecoratedUtils".to_string()),
+            docs: None,
+            args: None,
+            // Decorator on class at module level (outside Component)
+            code: r#"function logged(target: any) { return target; }
+
+@logged
+class Utils {
+    format(value: string) { return value.toUpperCase(); }
+}
+
+export default function Component(props: { text: string }) {
+    const u = new Utils();
+    return <div class="decorated">{u.format(props.text)}</div>;
+}"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Module-level decorator component should render successfully"
+    );
+
+    let html = outcome
+        .files
+        .get("test.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    println!("Decorator component output:\n{}", html);
+    assert!(
+        html.contains("HELLO"),
+        "Should render uppercase text: {}",
+        html
+    );
+    assert!(html.contains("decorated"), "Should have class: {}", html);
+}
+
+#[test]
+fn test_decorator_on_class_method_renders() {
+    let service = create_test_service();
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert(
+        "test.mdx".to_string(),
+        r#"<MethodDecorator text="hello" />"#.to_string(),
+    );
+
+    let mut components = HashMap::new();
+    components.insert(
+        "MethodDecorator".to_string(),
+        ComponentDefinition {
+            name: Some("MethodDecorator".to_string()),
+            docs: None,
+            args: None,
+            // Method decorator that wraps the function
+            code: r#"function uppercase(target: any, key: string, descriptor: PropertyDescriptor) {
+    const original = descriptor.value;
+    descriptor.value = function(value: string) {
+        return original.call(this, value).toUpperCase();
+    };
+    return descriptor;
+}
+
+class Utils {
+    @uppercase
+    format(value: string) { return value; }
+}
+
+export default function Component(props: { text: string }) {
+    const u = new Utils();
+    return <div class="method-dec">{u.format(props.text)}</div>;
+}"#
+            .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        outcome.is_all_success(),
+        "Method decorator component should render successfully"
+    );
+
+    let html = outcome
+        .files
+        .get("test.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .as_ref()
+        .unwrap();
+
+    println!("Method decorator output:\n{}", html);
+    assert!(
+        html.contains("HELLO"),
+        "Method decorator should transform to uppercase: {}",
+        html
+    );
+}
+
+#[test]
+fn test_invalid_export_default_arrow_function_fails() {
+    let service = create_test_service();
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("test.mdx".to_string(), "<ArrowComp />".to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "ArrowComp".to_string(),
+        ComponentDefinition {
+            name: Some("ArrowComp".to_string()),
+            docs: None,
+            args: None,
+            // Arrow functions are not supported
+            code: r#"export default () => <div>Arrow</div>"#.to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(
+        !outcome.is_all_success(),
+        "Render should fail for arrow function"
+    );
+
+    let error = outcome
+        .files
+        .get("test.mdx")
+        .unwrap()
+        .error
+        .as_ref()
+        .expect("Should have error");
+    println!("Arrow function error: {}", error);
+    assert!(
+        error.contains("arrow function"),
+        "Error should mention arrow function: {}",
+        error
+    );
+}
+
+#[test]
+fn test_invalid_export_default_class_fails() {
+    let service = create_test_service();
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert("test.mdx".to_string(), "<ClassComp />".to_string());
+
+    let mut components = HashMap::new();
+    components.insert(
+        "ClassComp".to_string(),
+        ComponentDefinition {
+            name: Some("ClassComp".to_string()),
+            docs: None,
+            args: None,
+            // Classes are not supported
+            code: r#"export default class Component { render() { return <div>Class</div>; } }"#
+                .to_string(),
+        },
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: mdx_files,
+        components: Some(components),
+    };
+
+    let outcome = service.render_batch(&input).expect("Failed to render");
+    assert!(!outcome.is_all_success(), "Render should fail for class");
+
+    let error = outcome
+        .files
+        .get("test.mdx")
+        .unwrap()
+        .error
+        .as_ref()
+        .expect("Should have error");
+    println!("Class error: {}", error);
+    assert!(
+        error.contains("class"),
+        "Error should mention class: {}",
+        error
+    );
+}
+
 #[test]
 fn test_jsx_component_with_expression_attributes() {
     // This test verifies that JSX components with expression attributes

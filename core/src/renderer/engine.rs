@@ -126,6 +126,38 @@ pub(super) fn setup_globals(runtime: &mut JsRuntime) -> Result<(), MdxError> {
                 return target;
             };
         }
+
+        // Decorator helper for legacy TypeScript decorators (used by Oxc transformer)
+        // Source: tslib __decorate helper
+        if (typeof globalThis._decorate === 'undefined') {
+            globalThis._decorate = function(decorators, target, key, desc) {
+                var c = arguments.length;
+                var r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc;
+                var d;
+                if (typeof Reflect === "object" && typeof Reflect.decorate === "function") {
+                    r = Reflect.decorate(decorators, target, key, desc);
+                } else {
+                    for (var i = decorators.length - 1; i >= 0; i--) {
+                        if (d = decorators[i]) {
+                            r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+                        }
+                    }
+                }
+                return c > 3 && r && Object.defineProperty(target, key, r), r;
+            };
+        }
+
+        // Metadata helper for TypeScript decorator metadata (used by Oxc transformer)
+        // Source: tslib __metadata helper
+        if (typeof globalThis._decorateMetadata === 'undefined') {
+            globalThis._decorateMetadata = function(metadataKey, metadataValue) {
+                if (typeof Reflect === "object" && typeof Reflect.metadata === "function") {
+                    return Reflect.metadata(metadataKey, metadataValue);
+                }
+                // Return a no-op decorator if Reflect.metadata is not available
+                return function() {};
+            };
+        }
     "#;
 
     runtime
