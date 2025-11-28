@@ -20,6 +20,7 @@ Safe, deterministic MDX rendering powered by a Rust core with batteries-included
 - [GitHub](https://github.com/hlop3z/dinja)
 - [PyPI](https://pypi.org/project/dinja)
 - [Crates.io](https://crates.io/crates/dinja-core)
+- [Container](https://github.com/hlop3z/dinja/pkgs/container/dinja)
 
 ## Installation
 
