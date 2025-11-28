@@ -1,6 +1,6 @@
 <div align="center">
 
-![Dinja Logo](docs/docs/assets/media/logo.png)
+![Dinja Logo](https://raw.githubusercontent.com/hlop3z/dinja/main/docs/docs/assets/media/logo.png)
 
 [![Documentation](https://img.shields.io/badge/docs-github.io-blue?style=flat-square)](https://hlop3z.github.io/dinja)
 [![Python](https://img.shields.io/pypi/v/dinja?style=flat-square)](https://pypi.org/project/dinja/)
