@@ -56,7 +56,7 @@ fn process_utils_code(utils_code: &str) -> String {
 
     // Try to extract the object from "export default { ... }"
     if let Some(rest) = trimmed.strip_prefix("export default") {
-        let obj = rest.trim();
+        let obj = rest.trim().trim_end_matches(';').trim_end();
         // Basic validation: should start with { and end with }
         if obj.starts_with('{') && obj.ends_with('}') {
             return format!("var utils = {};", obj);
@@ -319,4 +319,82 @@ pub(super) fn component_bootstrap_script(
         .map(build_component_registration_script)
         .transpose()
         .map(|maybe| maybe.unwrap_or_default())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn utils(code: &str) -> String {
+        // Access via build_render_script_wrapper with empty other parts
+        // process_utils_code is private so we test through the public wrapper
+        let script = build_render_script_wrapper("", "", "{}", "", Some(code)).unwrap();
+        // Extract the utils declaration line from the generated script
+        script
+            .lines()
+            .find(|l| l.trim().starts_with("var utils ="))
+            .map(|l| l.trim().to_string())
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn test_utils_no_semicolon() {
+        assert_eq!(
+            utils(r#"export default { message: "Hello" }"#),
+            r#"var utils = { message: "Hello" };"#
+        );
+    }
+
+    #[test]
+    fn test_utils_trailing_semicolon() {
+        assert_eq!(
+            utils(r#"export default { message: "Hello" };"#),
+            r#"var utils = { message: "Hello" };"#
+        );
+    }
+
+    #[test]
+    fn test_utils_trailing_semicolon_with_whitespace() {
+        assert_eq!(
+            utils(r#"export default { message: "Hello" };  "#),
+            r#"var utils = { message: "Hello" };"#
+        );
+    }
+
+    #[test]
+    fn test_utils_space_before_semicolon() {
+        assert_eq!(
+            utils(r#"export default { message: "Hello" } ;"#),
+            r#"var utils = { message: "Hello" };"#
+        );
+    }
+
+    #[test]
+    fn test_utils_empty_object() {
+        assert_eq!(utils("export default {}"), "var utils = {};");
+    }
+
+    #[test]
+    fn test_utils_empty_object_with_semicolon() {
+        assert_eq!(utils("export default {};"), "var utils = {};");
+    }
+
+    #[test]
+    fn test_utils_invalid_no_export_default() {
+        assert!(utils("const x = {}").is_empty());
+    }
+
+    #[test]
+    fn test_utils_invalid_missing_closing_brace() {
+        assert!(utils(r#"export default { message: "Hello""#).is_empty());
+    }
+
+    #[test]
+    fn test_utils_double_semicolon() {
+        // trim_end_matches strips all trailing semicolons, so ;; is also accepted
+        assert_eq!(
+            utils(r#"export default { message: "Hello" };;"#),
+            r#"var utils = { message: "Hello" };"#
+        );
+    }
 }
