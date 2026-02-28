@@ -69,8 +69,8 @@ fn test_html_output_simple_markdown() {
     // Verify HTML output is present
     assert!(result.output.is_some());
     let html = result.output.as_ref().unwrap();
-    assert!(html.contains("Hello World"));
-    assert!(html.contains("<strong>test</strong>") || html.contains("<b>test</b>"));
+    assert!(html.contains("<h1>") && html.contains("Hello World"), "# heading must produce <h1>: {html}");
+    assert!(html.contains("<strong>test</strong>") || html.contains("<b>test</b>"), "**bold** must produce <strong>: {html}");
 }
 
 #[test]
@@ -3219,4 +3219,94 @@ This is a paragraph with **bold** and *italic*.
     );
     // Check if markdown was processed
     println!("Markdown in JSX output: {}", html);
+}
+
+// =============================================================================
+// Markdown Transform Tests
+// Verify that markdown syntax is correctly converted to HTML tags.
+// =============================================================================
+
+fn render_mdx(mdx: &str) -> String {
+    let service = create_test_service();
+    let mut files = HashMap::new();
+    files.insert("test.mdx".to_string(), mdx.to_string());
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Html,
+            minify: false,
+            utils: None,
+            directives: None,
+        },
+        mdx: files,
+        components: None,
+    };
+    let outcome = service.render_batch(&input).expect("render failed");
+    assert!(outcome.is_all_success(), "render had failures");
+    outcome
+        .files
+        .get("test.mdx")
+        .unwrap()
+        .result
+        .as_ref()
+        .unwrap()
+        .output
+        .clone()
+        .unwrap()
+}
+
+#[test]
+fn test_markdown_h1() {
+    let html = render_mdx("# Hello World");
+    assert!(html.contains("<h1>") && html.contains("Hello World"), "# must produce <h1>: {html}");
+}
+
+#[test]
+fn test_markdown_h2() {
+    let html = render_mdx("## Section");
+    assert!(html.contains("<h2>") && html.contains("Section"), "## must produce <h2>: {html}");
+}
+
+#[test]
+fn test_markdown_h3() {
+    let html = render_mdx("### Sub");
+    assert!(html.contains("<h3>") && html.contains("Sub"), "### must produce <h3>: {html}");
+}
+
+#[test]
+fn test_markdown_bold() {
+    let html = render_mdx("**bold text**");
+    assert!(
+        html.contains("<strong>bold text</strong>") || html.contains("<b>bold text</b>"),
+        "**bold** must produce <strong>: {html}"
+    );
+}
+
+#[test]
+fn test_markdown_italic() {
+    let html = render_mdx("*italic text*");
+    assert!(
+        html.contains("<em>italic text</em>") || html.contains("<i>italic text</i>"),
+        "*italic* must produce <em>: {html}"
+    );
+}
+
+#[test]
+fn test_markdown_paragraph() {
+    let html = render_mdx("Hello World");
+    assert!(html.contains("<p>") && html.contains("Hello World"), "plain text must produce <p>: {html}");
+}
+
+#[test]
+fn test_markdown_heading_outside_html_block() {
+    // Heading at top level (not inside any HTML tag) must be converted.
+    let html = render_mdx("# Welcome\n\nSome content.");
+    assert!(html.contains("<h1>") && html.contains("Welcome"), "top-level # must produce <h1>: {html}");
+    assert!(html.contains("<p>") && html.contains("Some content"), "paragraph must produce <p>: {html}");
+}
+
+#[test]
+fn test_markdown_heading_with_jsx_component() {
+    // Heading alongside a JSX component — both must render correctly.
+    let html = render_mdx("# Title\n\n<div>some content</div>");
+    assert!(html.contains("<h1>") && html.contains("Title"), "# next to JSX must still produce <h1>: {html}");
 }
