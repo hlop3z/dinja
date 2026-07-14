@@ -40,6 +40,12 @@ Go tests:
 cd clients/go && go test ./...
 ```
 
+## Running a single test
+```bash
+cargo test -p dinja-core test_name                          # single Rust test
+uv run pytest clients/py/tests/test_render.py::test_name -v # single Python test
+```
+
 ## Test Commands Reference
 | Command | Description |
 |---------|-------------|

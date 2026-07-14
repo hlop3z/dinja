@@ -46,6 +46,11 @@ Install/update development dependencies:
    cd clients/go && go mod tidy
    ```
 
+5. **Git hooks** (fmt, clippy, core tests on commit):
+   ```bash
+   ./hooks/install.sh
+   ```
+
 ### For `full`:
 Complete setup including building all components:
 ```bash

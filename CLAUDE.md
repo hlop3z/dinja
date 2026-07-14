@@ -1,129 +1,85 @@
-# CLAUDE.md
+# How to develop here
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Project map
 
-## Project Overview
+Dinja is a safe, deterministic MDX (Markdown with JSX) renderer: a Rust core
+(`core/`, crate `dinja-core`) exposed as an HTTP service, with thin HTTP clients in
+`clients/py`, `clients/js`, and `clients/go`. Builds and tests go through
+`./utils/build.sh` (see `/build`, `/test`, `/lint`, `/dev-setup`, `/release`).
 
-Dinja is a safe, deterministic MDX (Markdown with JSX) renderer. It has a Rust core (`dinja-core`) that runs as an HTTP service, with Python, JavaScript, and Go HTTP clients.
-
-## Build Commands
-
-All builds use the centralized script `./utils/build.sh`:
-
-```bash
-./utils/build.sh build           # Build entire Rust workspace (debug)
-./utils/build.sh build-core      # Build core crate only (no Python needed)
-./utils/build.sh build-release   # Build workspace (release mode)
-```
-
-Client builds:
-
-```bash
-cd clients/js && npm run build   # Build JavaScript client
-cd clients/py && uv sync         # Sync Python client dependencies
-cd clients/go && go build ./...  # Build Go client
-```
-
-## Test Commands
-
-```bash
-./utils/build.sh test            # Run Rust tests
-./utils/build.sh test-core       # Run core crate tests only
-cd clients/js && npm test        # Run JavaScript tests
-cd clients/py && uv run pytest   # Run Python tests (requires service running)
-cd clients/go && go test ./...   # Run Go tests
-```
-
-Run a single Rust test:
-
-```bash
-cargo test -p dinja-core test_name
-```
-
-Run a single Python test:
-
-```bash
-uv run pytest clients/py/tests/test_render.py::test_name -v
-```
-
-## Lint and Format
-
-```bash
-cargo fmt --all -- --check                    # Check formatting
-cargo fmt --all                               # Fix formatting
-cargo clippy -p dinja-core -- -D warnings     # Lint
-cargo machete --skip-target-dir               # Check for unused dependencies
-```
-
-## Architecture
-
-### Workspace Structure
-
-- `core/` - Rust core library (`dinja-core` crate) and HTTP service
-- `clients/py/` - Python HTTP client
-- `clients/js/` - JavaScript/TypeScript HTTP client
-- `clients/go/` - Go HTTP client
-- `utils/build.sh` - Centralized build orchestration
-
-### Rendering Pipeline
+Rendering pipeline:
 
 ```
-MDX Content → Extract YAML Frontmatter (gray_matter) → Markdown to HTML (markdown crate)
-            → Transform JSX to JavaScript (oxc) → Execute in Deno Core → Output
+MDX → YAML frontmatter (gray_matter) → Markdown→HTML (markdown crate)
+    → JSX→JS (oxc) → execute in Deno Core → html | javascript | schema | json
 ```
 
-### Key Patterns
+Non-obvious constraints to respect:
 
-**Thread-Local Renderer Pool**: Each thread maintains its own cache of JavaScript runtimes because V8 isolates are not Send/Sync. This is managed in `core/src/renderer/pool.rs`.
+- **Renderer pool is thread-local** (`core/src/renderer/pool.rs`) because V8 isolates
+  are not Send/Sync. Don't try to share runtimes across threads.
+- **JS engine assets are embedded** via `include_str!` (`core/static/`) and extracted
+  to a temp dir on first use.
+- **Resource limits are load-bearing** (batch size, content/component size, cached
+  renderers) — they exist to prevent memory exhaustion; don't lift them casually.
+- Version lives in `VERSION` and is synced everywhere by `release.py`; never bump
+  version fields by hand.
+- Install pre-commit hooks with `./hooks/install.sh` (fmt, clippy, core tests).
 
-**HTTP Service Architecture**: The Rust core runs as an HTTP service. Python, JavaScript, and Go clients communicate with it via HTTP requests.
+## The workflow
 
-**Embedded Static Assets**: JavaScript engine code (`engine.min.js`, etc.) is embedded via `include_str!` and extracted to a temp directory on first use. See `core/static/`.
+This project drives all work through **OpenSpec**, augmented with an abstraction-layer
+discipline and a build-vs-adopt gate. Follow the pipeline — the rules apply themselves.
 
-**Resource Limits**: Prevents memory exhaustion with configurable limits:
-
-- `max_batch_size`: Default 1000
-- `max_mdx_content_size`: Default 10 MB
-- `max_component_code_size`: Default 1 MB
-- `max_cached_renderers`: Default 4
-
-### Output Formats
-
-- `html` - Rendered HTML
-- `javascript` - Transform back to JS
-- `schema` - Extract custom component names
-- `json` - JSON tree representation
-
-## Key Files
-
-- `core/src/service.rs` - Main `RenderService` implementation
-- `core/src/mdx.rs` - MDX parsing and rendering
-- `core/src/renderer/engine.rs` - Deno Core integration
-- `core/src/transform.rs` - TSX/JSX transformation using oxc
-
-## Release Process
-
-Version is managed in `VERSION` file and synced to workspace `Cargo.toml`. The release script `release.py` handles version bumping and tagging. CI/CD publishes to PyPI, npm, crates.io, and Docker Hub on tag push.
-
-## Git Hooks
-
-Install pre-commit hooks for automatic checks before commits:
-
-```bash
-./hooks/install.sh
+```
+/opsx:explore   Think it through. Decompose (invariants, boundaries, ≥3 strategies). No code.
+      ↓
+/opsx:propose   Generate proposal.md (WHY/scope) + specs (abstract WHAT) + design.md (HOW).
+      ↓
+/opsx:decide    Build-vs-adopt gate: per critical concern, Rent>Adopt>Extend>Fork>Build.
+      ↓             Records each decision into design.md. Run before implementing.
+/opsx:apply     Implement the tasks. Thin entry points; adapters isolate every dependency.
+      ↓
+/opsx:sync      Fold the change's delta specs into the main specs.
+      ↓
+/opsx:archive   Close out the completed change.
 ```
 
-The pre-commit hook runs:
-- Rust formatting check (`cargo fmt`)
-- Clippy linting (`cargo clippy -p dinja-core`)
-- Core tests (`cargo test -p dinja-core`)
-- Unused dependency check (if `cargo-machete` installed)
-- Python/JS/Go checks (if those clients are modified)
+## The two ideas that make this work
 
-## Requirements
+1. **Abstraction layers stay separate.** WHAT (`specs/`) is language-agnostic behavior.
+   HOW (`design.md`) is structure + tool choices. DO (`tasks.md` + code) is the implementation.
+   No layer leaks into another. Core holds behavior; every surface (CLI/GUI/API) is a thin adapter.
 
-- Rust (stable)
-- Python 3.13+ (for Python client)
-- Node.js 18+ (for JS client)
-- Go 1.21+ (for Go client)
-- `uv` package manager (Python environment management)
+2. **Adopt before you build.** For anything correctness-, security-, or reliability-critical,
+   prefer a mature tool over hand-writing it. `/opsx:decide` makes that call explicit and records it.
+
+## Where the rules live (don't restate them)
+
+- **`openspec/config.yaml`** — the philosophy, injected once into every artifact by the CLI.
+- **`openspec/guidelines.md`** — the full reference: build-vs-adopt hierarchy, maturity rubric, doc taxonomy.
+
+Commands stay thin and point at these, so a change costs few tokens to plan.
+
+## Keep the main thread cheap
+
+For broad or exploratory searches — locating code across many files, surveying naming
+conventions, answering a question that spans several files — delegate to the `Explore` or
+`general-purpose` subagent and keep only its conclusion. Don't read the file dumps into the
+main thread. For a single known file or symbol, just search directly (a subagent would cost
+more than it saves).
+
+## Where findings go (promote or discard — never accumulate)
+
+There is **no `/research` folder**. A global, ever-growing notes dump rots and starts
+misleading. Every durable finding gets exactly one canonical home; everything else dies in
+the scratchpad. When a subagent surfaces something worth keeping, route it:
+
+- **Throwaway exploration** → the session scratchpad. Auto-discarded; never committed.
+- **Derivable from code** → leave it in the code. Don't snapshot it.
+- **A decision + its why** (build-vs-adopt, tradeoffs) → `design.md` ADR block.
+- **Durable behavior contract** → `specs/` (synced to main specs on `/opsx:sync`).
+- **In-flight notes for a specific change** → `openspec/changes/<change>/`, archived on `/opsx:archive`.
+- **Non-derivable fact about the user/project** → the memory dir; update or delete when wrong.
+
+The discipline is promote-or-discard, not save-more: one home, one lifecycle, one owner.
