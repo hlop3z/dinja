@@ -69,8 +69,14 @@ fn test_html_output_simple_markdown() {
     // Verify HTML output is present
     assert!(result.output.is_some());
     let html = result.output.as_ref().unwrap();
-    assert!(html.contains("<h1>") && html.contains("Hello World"), "# heading must produce <h1>: {html}");
-    assert!(html.contains("<strong>test</strong>") || html.contains("<b>test</b>"), "**bold** must produce <strong>: {html}");
+    assert!(
+        html.contains("<h1>") && html.contains("Hello World"),
+        "# heading must produce <h1>: {html}"
+    );
+    assert!(
+        html.contains("<strong>test</strong>") || html.contains("<b>test</b>"),
+        "**bold** must produce <strong>: {html}"
+    );
 }
 
 #[test]
@@ -309,6 +315,73 @@ fn test_schema_output_format() {
 
     // Directives should be present but empty
     assert!(schema_obj["directives"].is_object());
+}
+
+#[test]
+fn test_schema_output_with_directives() {
+    let service = create_test_service();
+
+    let mut mdx_files = HashMap::new();
+    mdx_files.insert(
+        "schema_directives.mdx".to_string(),
+        "# Directives\n\n<div v-on:click=\"handleClick\" v-show=\"visible\" x-data=\"{ open: false }\">Menu</div>\n\n<button v-on:submit=\"save\">Save</button>".to_string(),
+    );
+
+    let input = NamedMdxBatchInput {
+        settings: RenderSettings {
+            output: OutputFormat::Schema,
+            minify: false,
+            utils: None,
+            directives: Some(vec!["v-".to_string(), "x-".to_string()]),
+        },
+        mdx: mdx_files,
+        components: None,
+    };
+
+    let outcome = service
+        .render_batch(&input)
+        .expect("Failed to render batch");
+
+    assert!(outcome.is_all_success());
+
+    let file_outcome = outcome
+        .files
+        .get("schema_directives.mdx")
+        .expect("File not found");
+    let result = file_outcome
+        .result
+        .as_ref()
+        .expect("Result should be present");
+    let schema = result.output.as_ref().expect("Schema output missing");
+
+    println!("Schema with directives:\n{}", schema);
+
+    let schema_obj: serde_json::Value =
+        serde_json::from_str(schema).expect("Schema should be valid JSON");
+
+    // Exact attribute names that matched a prefix, sorted
+    let keys: Vec<&str> = schema_obj["directives"]["keys"]
+        .as_array()
+        .expect("keys should be array")
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert_eq!(keys, vec!["v-on:click", "v-on:submit", "v-show", "x-data"]);
+
+    // Wildcard patterns: "prefix:*" for namespaced keys, "prefix*" otherwise
+    let patterns: Vec<&str> = schema_obj["directives"]["patterns"]
+        .as_array()
+        .expect("patterns should be array")
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert_eq!(patterns, vec!["v-*", "v-on:*", "x-*"]);
+
+    // Unique attribute values
+    let values = schema_obj["directives"]["values"]
+        .as_array()
+        .expect("values should be array");
+    assert_eq!(values.len(), 4);
 }
 
 #[test]
@@ -3257,19 +3330,28 @@ fn render_mdx(mdx: &str) -> String {
 #[test]
 fn test_markdown_h1() {
     let html = render_mdx("# Hello World");
-    assert!(html.contains("<h1>") && html.contains("Hello World"), "# must produce <h1>: {html}");
+    assert!(
+        html.contains("<h1>") && html.contains("Hello World"),
+        "# must produce <h1>: {html}"
+    );
 }
 
 #[test]
 fn test_markdown_h2() {
     let html = render_mdx("## Section");
-    assert!(html.contains("<h2>") && html.contains("Section"), "## must produce <h2>: {html}");
+    assert!(
+        html.contains("<h2>") && html.contains("Section"),
+        "## must produce <h2>: {html}"
+    );
 }
 
 #[test]
 fn test_markdown_h3() {
     let html = render_mdx("### Sub");
-    assert!(html.contains("<h3>") && html.contains("Sub"), "### must produce <h3>: {html}");
+    assert!(
+        html.contains("<h3>") && html.contains("Sub"),
+        "### must produce <h3>: {html}"
+    );
 }
 
 #[test]
@@ -3293,20 +3375,32 @@ fn test_markdown_italic() {
 #[test]
 fn test_markdown_paragraph() {
     let html = render_mdx("Hello World");
-    assert!(html.contains("<p>") && html.contains("Hello World"), "plain text must produce <p>: {html}");
+    assert!(
+        html.contains("<p>") && html.contains("Hello World"),
+        "plain text must produce <p>: {html}"
+    );
 }
 
 #[test]
 fn test_markdown_heading_outside_html_block() {
     // Heading at top level (not inside any HTML tag) must be converted.
     let html = render_mdx("# Welcome\n\nSome content.");
-    assert!(html.contains("<h1>") && html.contains("Welcome"), "top-level # must produce <h1>: {html}");
-    assert!(html.contains("<p>") && html.contains("Some content"), "paragraph must produce <p>: {html}");
+    assert!(
+        html.contains("<h1>") && html.contains("Welcome"),
+        "top-level # must produce <h1>: {html}"
+    );
+    assert!(
+        html.contains("<p>") && html.contains("Some content"),
+        "paragraph must produce <p>: {html}"
+    );
 }
 
 #[test]
 fn test_markdown_heading_with_jsx_component() {
     // Heading alongside a JSX component — both must render correctly.
     let html = render_mdx("# Title\n\n<div>some content</div>");
-    assert!(html.contains("<h1>") && html.contains("Title"), "# next to JSX must still produce <h1>: {html}");
+    assert!(
+        html.contains("<h1>") && html.contains("Title"),
+        "# next to JSX must still produce <h1>: {html}"
+    );
 }

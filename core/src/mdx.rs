@@ -703,8 +703,8 @@ fn traverse_json_tree(
                 }
             }
 
-            // Check attributes for directives
-            if let Some(serde_json::Value::Object(attrs)) = obj.get("attributes") {
+            // Check attributes for directives (the engine emits them under "props")
+            if let Some(serde_json::Value::Object(attrs)) = obj.get("props") {
                 for (key, value) in attrs {
                     // Check if this attribute matches any directive prefix
                     for prefix in prefixes {

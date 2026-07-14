@@ -82,12 +82,61 @@ console.log(getOutput(result, "page.mdx"));
 
 ## Output Formats
 
-| Format       | Description                    |
-| ------------ | ------------------------------ |
-| `html`       | Rendered HTML                  |
-| `javascript` | JavaScript code                |
-| `schema`     | Extract custom component names |
-| `json`       | JSON tree representation       |
+| Format       | Description                                     |
+| ------------ | ----------------------------------------------- |
+| `html`       | Rendered HTML                                   |
+| `javascript` | JavaScript code                                 |
+| `schema`     | Extract custom component names and directives   |
+| `json`       | JSON tree representation                        |
+
+## Directives
+
+Directives are framework-style attributes (Vue's `v-on:click`, Alpine's `x-data`, etc.)
+used in your MDX. Pass a list of attribute-name **prefixes** via `directives` and the
+`schema` output reports every matching attribute it finds — useful for auditing which
+client-side behaviors your content relies on.
+
+**Python:**
+
+```python
+result = renderer.schema(
+    views={
+        "menu.mdx": '<div v-on:click="toggle" v-show="open" x-data="{ open: false }">Menu</div>'
+    },
+    directives=["v-", "x-"],
+)
+print(result.get_output("menu.mdx"))
+```
+
+**TypeScript:**
+
+```typescript
+const result = await renderer.schema({
+  views: { "menu.mdx": '<div v-on:click="toggle" v-show="open" x-data="{ open: false }">Menu</div>' },
+  directives: ["v-", "x-"],
+});
+console.log(getOutput(result, "menu.mdx"));
+```
+
+Both print:
+
+```json
+{
+  "components": [],
+  "directives": {
+    "keys": ["v-on:click", "v-show", "x-data"],
+    "patterns": ["v-*", "v-on:*", "x-*"],
+    "values": ["open", "toggle", "{ open: false }"]
+  }
+}
+```
+
+- `keys` — the exact attribute names that matched a prefix
+- `patterns` — wildcard summaries: `v-on:*` for namespaced attributes, `v-*` otherwise
+- `values` — the unique attribute values
+
+The `directives` parameter is accepted by all render methods but only affects `schema`
+output; other formats ignore it.
 
 ## Components
 

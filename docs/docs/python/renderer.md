@@ -113,7 +113,8 @@ async def javascript(...) -> Result
 
 ### schema()
 
-Extracts custom component names from MDX content.
+Extracts custom component names — and, if `directives` is set, directive attributes —
+from MDX content.
 
 ```python
 # Sync
@@ -129,6 +130,36 @@ def schema(
 # Async
 async def schema(...) -> Result
 ```
+
+`directives` is a list of attribute-name prefixes (e.g. `["v-", "x-"]`). Every attribute
+in the rendered tree that starts with one of the prefixes is reported in the schema output:
+
+```python
+result = renderer.schema(
+    views={
+        "menu.mdx": '<div v-on:click="toggle" v-show="open" x-data="{ open: false }">Menu</div>'
+    },
+    directives=["v-", "x-"],
+)
+print(result.get_output("menu.mdx"))
+```
+
+```json
+{
+  "components": [],
+  "directives": {
+    "keys": ["v-on:click", "v-show", "x-data"],
+    "patterns": ["v-*", "v-on:*", "x-*"],
+    "values": ["open", "toggle", "{ open: false }"]
+  }
+}
+```
+
+- `keys` — exact attribute names that matched a prefix
+- `patterns` — wildcard summaries (`v-on:*` for namespaced attributes, `v-*` otherwise)
+- `values` — unique attribute values
+
+The `directives` parameter is accepted by all render methods but only affects `schema` output.
 
 ### json()
 
